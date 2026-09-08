@@ -26,5 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
+      - name: Verify runner architecture
+        run: test "$(nix eval --impure --raw --expr builtins.currentSystem)" = "${{ matrix.system }}"
       - run: nix fmt -- --check
       - run: nix flake check --print-build-logs
