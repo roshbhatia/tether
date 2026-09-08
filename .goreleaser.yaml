@@ -1,0 +1,58 @@
+version: 2
+project_name: tether
+env:
+  - CGO_ENABLED=0
+
+before:
+  hooks:
+    - ./hack/generate.sh --check
+
+builds:
+  - id: tether
+    main: ./cmd/main
+    binary: tether
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: tether
+    ids: [tether]
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
+      - src: completions/*
+        dst: completions
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+homebrew_casks:
+  - name: tether
+    ids: [tether]
+    binaries: [tether]
+    homepage: https://github.com/roshbhatia/tether
+    description: Example composable Go CLI
+    license: MIT
+    completions:
+      bash: completions/tether.bash
+      zsh: completions/_tether
+      fish: completions/tether.fish
+    hooks:
+      post:
+        install: |
+          system_command "/bin/mkdir", args: ["-p", "#{HOMEBREW_PREFIX}/share/nushell/vendor/autoload"]
+          system_command "/bin/cp", args: ["#{staged_path}/completions/tether.nu", "#{HOMEBREW_PREFIX}/share/nushell/vendor/autoload/tether.nu"]
+        uninstall: |
+          system_command "/bin/rm", args: ["-f", "#{HOMEBREW_PREFIX}/share/nushell/vendor/autoload/tether.nu"]
+    repository:
+      owner: roshbhatia
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"

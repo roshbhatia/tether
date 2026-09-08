@@ -1,0 +1,46 @@
+#compdef tether
+
+_tether() {
+  local context=''
+  local word
+  local consume_value=0
+  local options_done=0
+  for word in ${words[2,$((CURRENT - 1))]}; do
+    if (( consume_value )); then
+      consume_value=0
+      continue
+    fi
+    if (( options_done )); then
+      continue
+    fi
+    if [[ "$word" == '--' ]]; then
+      options_done=1
+      continue
+    fi
+    case "$context:$word" in
+    esac
+    case "$context:$word" in
+      ':completion') context='completion' ;;
+      ':completion') context='completion' ;;
+    esac
+  done
+  case "$context" in
+    '')
+      _arguments \
+        '(-h)--help[Print command help]' \
+        '--json[Write JSON to stdout]' \
+        '--version[Write the version to stdout]' \
+        '1:command:(completion completion)'
+
+      ;;
+    'completion')
+      _arguments \
+        '2:shell:(bash zsh fish nu)'
+      ;;
+    'completion')
+      _arguments \
+        '2:shell:(bash zsh fish nu)'
+      ;;
+  esac
+}
+compdef _tether tether
