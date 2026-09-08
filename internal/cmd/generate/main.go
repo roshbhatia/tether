@@ -1,3 +1,5 @@
+// Command generate renders the committed artifacts: completions, the README
+// command section, and the JSON Schemas. --check fails when any differs.
 package main
 
 import (
@@ -7,8 +9,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/roshbhatia/tether/internal/command"
 	"github.com/roshbhatia/go-utils/completion"
+	goconfig "github.com/roshbhatia/go-utils/config"
+	"github.com/roshbhatia/tether/internal/command"
+	"github.com/roshbhatia/tether/internal/config"
+	"github.com/roshbhatia/tether/internal/plan"
+	"github.com/roshbhatia/tether/internal/probe"
 )
 
 var completionFiles = map[string]string{
@@ -40,6 +46,18 @@ func main() {
 		fail(err)
 	}
 	update("README.md", []byte(rendered), *check)
+
+	for path, render := range map[string]func() ([]byte, error){
+		"schema/tether.plan.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[plan.Output](plan.Version) },
+		"schema/tether.host.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[probe.Host](probe.HostVersion) },
+		"schema/config.schema.json":         config.Schema,
+	} {
+		schema, err := render()
+		if err != nil {
+			fail(err)
+		}
+		update(path, schema, *check)
+	}
 }
 
 func update(path string, content []byte, check bool) {
