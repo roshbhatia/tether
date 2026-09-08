@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Flaky": {
+      "properties": {
+        "rtt_ms": {
+          "type": "number",
+          "description": "Round-trip time in milliseconds above which the link is flaky"
+        },
+        "loss": {
+          "type": "number",
+          "description": "Loss fraction (0-1) above which the link is flaky"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "rtt_ms",
+        "loss"
+      ]
+    },
+    "Host": {
+      "properties": {
+        "pin": {
+          "type": "string",
+          "enum": [
+            "native-mux",
+            "mosh-mux",
+            "ssh-raw",
+            "ssh"
+          ],
+          "description": "Tier that always wins; an unavailable pin is an error"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "native",
+            "roam",
+            "persist"
+          ],
+          "description": "Mode for this host; overrides the top-level mode"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "native",
+        "roam",
+        "persist"
+      ],
+      "description": "Default ordering mode"
+    },
+    "flaky": {
+      "$ref": "#/$defs/Flaky"
+    },
+    "hosts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Host"
+      },
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "mode",
+    "flaky"
+  ],
+  "title": "tether.config/v1"
+}

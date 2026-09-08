@@ -1,4 +1,14 @@
 #compdef tether
+__tether_completion_values_0() {
+  local -a values
+  values=( 'auto' 'native' 'roam' 'persist')
+  compadd -a values
+}
+__tether_completion_values_1() {
+  local -a values
+  values=( 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh')
+  compadd -a values
+}
 
 _tether() {
   local context=''
@@ -18,9 +28,28 @@ _tether() {
       continue
     fi
     case "$context:$word" in
+      'plan:--host') consume_value=1; continue ;;
+      'plan:--host='*) continue ;;
+      'plan:--session') consume_value=1; continue ;;
+      'plan:--session='*) continue ;;
+      'plan:--native') consume_value=1; continue ;;
+      'plan:--native='*) continue ;;
+      'plan:--native-raw') consume_value=1; continue ;;
+      'plan:--native-raw='*) continue ;;
+      'plan:--mode') consume_value=1; continue ;;
+      'plan:--mode='*) continue ;;
+      'plan:--pin') consume_value=1; continue ;;
+      'plan:--pin='*) continue ;;
+      'probe:--host') consume_value=1; continue ;;
+      'probe:--host='*) continue ;;
+      'status:--host') consume_value=1; continue ;;
+      'status:--host='*) continue ;;
     esac
     case "$context:$word" in
       ':completion') context='completion' ;;
+      ':plan') context='plan' ;;
+      ':probe') context='probe' ;;
+      ':status') context='status' ;;
       ':completion') context='completion' ;;
     esac
   done
@@ -28,14 +57,40 @@ _tether() {
     '')
       _arguments \
         '(-h)--help[Print command help]' \
-        '--json[Write JSON to stdout]' \
         '--version[Write the version to stdout]' \
-        '1:command:(completion completion)'
+        '1:command:(completion plan probe status completion)'
 
       ;;
     'completion')
       _arguments \
         '2:shell:(bash zsh fish nu)'
+      ;;
+    'plan')
+      _arguments \
+        '--host[ssh host alias]:value:' \
+        '--session[Session name echoed in the output]:value:' \
+        '--native[Opaque ref of the callers native mux domain]:value:' \
+        '--native-raw[Opaque ref of the callers raw ssh domain]:value:' \
+        '--mode[Ordering mode; overrides the config]:value:__tether_completion_values_0' \
+        '--pin[Tier that must win; overrides the config]:value:__tether_completion_values_1' \
+        '(-h)--help[Print command help]' \
+        '*:argument:'
+
+      ;;
+    'probe')
+      _arguments \
+        '--host[ssh host alias]:value:' \
+        '--force[Probe even inside the unreachable-host backoff]' \
+        '(-h)--help[Print command help]' \
+        '*:argument:'
+
+      ;;
+    'status')
+      _arguments \
+        '--host[Only this host]:value:' \
+        '(-h)--help[Print command help]' \
+        '*:argument:'
+
       ;;
     'completion')
       _arguments \

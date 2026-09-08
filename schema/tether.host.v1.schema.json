@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Link": {
+      "properties": {
+        "rtt_ms": {
+          "type": "number"
+        },
+        "loss": {
+          "type": "number",
+          "description": "Lost fraction (0-1)"
+        },
+        "direct": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Not relayed; null when the tool cannot tell"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "enum": [
+            "tailscale",
+            "ping"
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "rtt_ms",
+        "loss",
+        "direct",
+        "tool",
+        "at"
+      ]
+    },
+    "Local": {
+      "properties": {
+        "mosh": {
+          "type": "string",
+          "description": "Path to mosh; empty when absent"
+        },
+        "wezterm": {
+          "type": "string",
+          "description": "Path to wezterm; empty when absent"
+        },
+        "ssh": {
+          "type": "string",
+          "description": "Path to ssh; empty when absent"
+        },
+        "hostname": {
+          "type": "string",
+          "description": "HostName from ssh -G; else the alias"
+        },
+        "user": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "mosh",
+        "wezterm",
+        "ssh",
+        "hostname"
+      ]
+    },
+    "Registry": {
+      "properties": {
+        "present": {
+          "type": "boolean",
+          "description": "tailscale status answered"
+        },
+        "peer": {
+          "type": "boolean",
+          "description": "The host matched a tailnet peer"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "relay": {
+          "type": "string"
+        },
+        "direct": {
+          "type": "boolean",
+          "description": "A direct path was active at status time"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "present",
+        "peer",
+        "online",
+        "direct"
+      ]
+    },
+    "Remote": {
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why the round trip failed or was skipped"
+        },
+        "mosh_server": {
+          "type": "string"
+        },
+        "zmx": {
+          "type": "string"
+        },
+        "tmux": {
+          "type": "string"
+        },
+        "wezterm_mux_server": {
+          "type": "string"
+        },
+        "versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this remote layer last ran (success or failure)"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "ok",
+        "mosh_server",
+        "zmx",
+        "tmux",
+        "wezterm_mux_server",
+        "versions",
+        "at"
+      ]
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "host": {
+      "type": "string"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "local": {
+      "$ref": "#/$defs/Local"
+    },
+    "remote": {
+      "$ref": "#/$defs/Remote"
+    },
+    "registry": {
+      "$ref": "#/$defs/Registry"
+    },
+    "link": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Link",
+          "description": "Latest link sample; null when the host was not sampled"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "host",
+    "at",
+    "local",
+    "remote",
+    "registry",
+    "link"
+  ],
+  "title": "tether.host/v1"
+}

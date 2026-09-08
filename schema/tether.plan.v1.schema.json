@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Alternative": {
+      "properties": {
+        "tier": {
+          "type": "string"
+        },
+        "rank": {
+          "type": "integer"
+        },
+        "plan": {
+          "$ref": "#/$defs/CommandPlan"
+        },
+        "hop": {
+          "$ref": "#/$defs/Hop"
+        },
+        "gives": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "loses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tier",
+        "rank",
+        "plan",
+        "hop",
+        "gives",
+        "loses"
+      ]
+    },
+    "Chosen": {
+      "properties": {
+        "tier": {
+          "type": "string"
+        },
+        "rank": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tier",
+        "rank"
+      ]
+    },
+    "CommandPlan": {
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "cwd": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "successCodes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "command",
+        "cwd",
+        "environment",
+        "successCodes"
+      ]
+    },
+    "Filtered": {
+      "properties": {
+        "tier": {
+          "type": "string"
+        },
+        "rank": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tier",
+        "rank",
+        "reason"
+      ]
+    },
+    "Hop": {
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "local",
+            "native"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "description": "Opaque caller ref; echoed and never parsed"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind"
+      ]
+    },
+    "Probe": {
+      "properties": {
+        "at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the remote inventory was taken; null with no record"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "age_s": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stale": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "at",
+        "age_s",
+        "stale"
+      ]
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "host": {
+      "type": "string"
+    },
+    "session": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "error"
+      ]
+    },
+    "error": {
+      "type": "string"
+    },
+    "chosen": {
+      "$ref": "#/$defs/Chosen"
+    },
+    "plan": {
+      "$ref": "#/$defs/CommandPlan"
+    },
+    "hop": {
+      "$ref": "#/$defs/Hop"
+    },
+    "gives": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "loses": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "reasons": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "alternatives": {
+      "items": {
+        "$ref": "#/$defs/Alternative"
+      },
+      "type": "array"
+    },
+    "filtered": {
+      "items": {
+        "$ref": "#/$defs/Filtered"
+      },
+      "type": "array"
+    },
+    "probe": {
+      "$ref": "#/$defs/Probe"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "host",
+    "status",
+    "reasons",
+    "alternatives",
+    "filtered",
+    "probe"
+  ],
+  "title": "tether.plan/v1"
+}
