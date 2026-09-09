@@ -17,7 +17,7 @@ var remoteTools = []string{"mosh-server", "zmx", "tmux", "wezterm-mux-server"}
 
 // remoteScript runs under sh so the remote login shell does not matter
 // (a nushell login shell has no `command -v`). One line, no single quotes.
-const remoteScript = `for t in mosh-server zmx tmux wezterm-mux-server; do p=$(command -v "$t" 2>/dev/null) || continue; printf "path:%s=%s\n" "$t" "$p"; case $t in tmux) v=$(tmux -V 2>&1 | head -n 1);; *) v=$("$t" --version 2>&1 | head -n 1);; esac; printf "version:%s=%s\n" "$t" "$v"; done; exit 0`
+const remoteScript = `printf "home:=%s\n" "$HOME"; for t in mosh-server zmx tmux wezterm-mux-server; do p=$(command -v "$t" 2>/dev/null) || continue; printf "path:%s=%s\n" "$t" "$p"; case $t in tmux) v=$(tmux -V 2>&1 | head -n 1);; *) v=$("$t" --version 2>&1 | head -n 1);; esac; printf "version:%s=%s\n" "$t" "$v"; done; exit 0`
 
 // RemoteScript is the exact remote command line, exposed for tests and docs.
 func RemoteScript() string {
@@ -84,6 +84,8 @@ func parseRemoteInventory(out []byte, remote *Remote) {
 			continue
 		}
 		switch kind {
+		case "home":
+			remote.Home = value
 		case "path":
 			switch tool {
 			case "mosh-server":

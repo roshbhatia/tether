@@ -15,7 +15,7 @@ func LocalLayer(ctx context.Context, tools Tools, host string) Local {
 		Mosh:     tools.lookPath("mosh"),
 		Wezterm:  tools.lookPath("wezterm"),
 		SSH:      tools.lookPath("ssh"),
-		Hostname: host,
+		Hostname: hostPart(host),
 	}
 	if local.SSH == "" || tools.Run == nil {
 		return local
@@ -31,6 +31,14 @@ func LocalLayer(ctx context.Context, tools Tools, host string) Local {
 	local.User = user
 	local.Port = port
 	return local
+}
+
+// hostPart strips a user@ prefix.
+func hostPart(target string) string {
+	if _, host, ok := strings.Cut(target, "@"); ok {
+		return host
+	}
+	return target
 }
 
 func parseSSHConfig(out []byte) (hostname, user string, port int) {

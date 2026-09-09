@@ -41,6 +41,7 @@ type Remote struct {
 	Zmx              string            `json:"zmx"`
 	Tmux             string            `json:"tmux"`
 	WeztermMuxServer string            `json:"wezterm_mux_server"`
+	Home             string            `json:"home,omitempty" jsonschema:"description=The remote $HOME; a native hop starts there"`
 	Versions         map[string]string `json:"versions"`
 	At               time.Time         `json:"at" jsonschema:"description=When this remote layer last ran (success or failure)"`
 }
@@ -52,6 +53,8 @@ type Registry struct {
 	Online  bool   `json:"online"`
 	Relay   string `json:"relay,omitempty"`
 	Direct  bool   `json:"direct" jsonschema:"description=A direct path was active at status time"`
+	DNSName string `json:"dns_name,omitempty" jsonschema:"description=MagicDNS name of the matched peer"`
+	SSH     bool   `json:"ssh" jsonschema:"description=The peer advertises SSH host keys, so it runs Tailscale SSH"`
 }
 
 // Link is one round-trip sample.
@@ -67,6 +70,7 @@ type Link struct {
 type Host struct {
 	Version  string    `json:"version"`
 	Host     string    `json:"host"`
+	Target   string    `json:"target,omitempty" jsonschema:"description=What ssh was given when it differs from host"`
 	At       time.Time `json:"at"`
 	Local    Local     `json:"local"`
 	Remote   Remote    `json:"remote"`
@@ -126,6 +130,16 @@ func (tools Tools) lookPath(name string) string {
 type Options struct {
 	// Force runs the remote layer even inside a negative-cache backoff.
 	Force bool
+	// Target is the argument ssh gets; "" means the host name itself. A
+	// tailnet-only host is keyed by its name and reached by its MagicDNS name.
+	Target string
+}
+
+func (options Options) target(host string) string {
+	if options.Target != "" {
+		return options.Target
+	}
+	return host
 }
 
 // Run measures every layer and writes the host record.
@@ -133,8 +147,9 @@ func Run(ctx context.Context, tools Tools, host string, options Options) (Host, 
 	now := tools.Now()
 	previous, hadPrevious, _ := Read(host)
 
-	record := Host{Version: HostVersion, Host: host, At: now}
-	record.Local = LocalLayer(ctx, tools, host)
+	target := options.target(host)
+	record := Host{Version: HostVersion, Host: host, Target: target, At: now}
+	record.Local = LocalLayer(ctx, tools, target)
 	record.Registry = RegistryLayer(ctx, tools, host, record.Local.Hostname)
 
 	switch {
@@ -144,7 +159,7 @@ func Run(ctx context.Context, tools Tools, host string, options Options) (Host, 
 		if skip, reason := GuardsRemote(record.Local.Hostname, record.Registry); skip {
 			record.Remote = Remote{Reason: reason, Versions: map[string]string{}, At: now}
 		} else {
-			record.Remote = RemoteLayer(ctx, tools, host, now)
+			record.Remote = RemoteLayer(ctx, tools, target, now)
 		}
 	}
 

@@ -2,6 +2,8 @@
 package plan
 
 import (
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/roshbhatia/tether/internal/rank"
@@ -60,6 +62,7 @@ type Probe struct {
 type Output struct {
 	Version      string        `json:"version"`
 	Host         string        `json:"host"`
+	Target       string        `json:"target,omitempty" jsonschema:"description=What ssh and mosh are given when it differs from host, such as user@name.ts.net"`
 	Session      string        `json:"session,omitempty"`
 	Status       string        `json:"status" jsonschema:"enum=ok,enum=error"`
 	Error        string        `json:"error,omitempty"`
@@ -92,9 +95,13 @@ func CommandFor(tier, host string, inner []string, refs Refs) (CommandPlan, Hop)
 		command.Command = append([]string{}, inner...)
 		return command, Hop{Kind: "native", Ref: refs.NativeRaw}
 	case rank.MoshMux:
+		// mosh keeps the argv: it quotes the words for the remote login shell
+		// itself and mosh-server execs them without a shell.
 		command.Command = wrap([]string{"mosh", host}, inner)
 	default:
-		command.Command = wrap([]string{"ssh", "-t", host}, inner)
+		// ssh joins the words with spaces for the remote login shell, so each
+		// one is quoted here or `sh -c 'echo $(hostname)'` arrives unquoted.
+		command.Command = wrap([]string{"ssh", "-t", host}, quoteAll(inner))
 	}
 	return command, Hop{Kind: "local"}
 }
@@ -106,10 +113,42 @@ func wrap(prefix, inner []string) []string {
 	return append(append(prefix, "--"), inner...)
 }
 
+var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./:=@%+,-]+$`)
+
+// quoteAll single-quotes every word the remote shell would otherwise split
+// or expand. POSIX shells and nushell both read '...' literally; a word with
+// its own single quote uses the POSIX '\” idiom, which nushell does not.
+func quoteAll(words []string) []string {
+	quoted := make([]string, 0, len(words))
+	for _, word := range words {
+		if word != "" && plainWord.MatchString(word) {
+			quoted = append(quoted, word)
+			continue
+		}
+		quoted = append(quoted, "'"+strings.ReplaceAll(word, "'", `'\''`)+"'")
+	}
+	return quoted
+}
+
+// Subject is what the plan is for: the host as the caller named it, the
+// argument ssh and mosh get, and the session echoed in the output.
+type Subject struct {
+	Host    string
+	Target  string
+	Session string
+}
+
+func (subject Subject) target() string {
+	if subject.Target != "" {
+		return subject.Target
+	}
+	return subject.Host
+}
+
 // Build renders a successful ranking.
-func Build(host, session string, inner []string, refs Refs, result rank.Result, probe Probe) Output {
+func Build(subject Subject, inner []string, refs Refs, result rank.Result, probe Probe) Output {
 	output := Output{
-		Version: Version, Host: host, Session: session, Status: "ok",
+		Version: Version, Host: subject.Host, Target: subject.Target, Session: subject.Session, Status: "ok",
 		Reasons: append([]string{}, result.Reasons...), Probe: probe,
 		Alternatives: []Alternative{}, Filtered: filtered(result),
 	}
@@ -117,14 +156,14 @@ func Build(host, session string, inner []string, refs Refs, result rank.Result, 
 		return output
 	}
 	chosen := result.Ordered[0]
-	command, hop := CommandFor(chosen.Name, host, inner, refs)
+	command, hop := CommandFor(chosen.Name, subject.target(), inner, refs)
 	output.Chosen = &Chosen{Tier: chosen.Name, Rank: chosen.Rank}
 	output.Plan = &command
 	output.Hop = &hop
 	output.Gives = chosen.Gives
 	output.Loses = chosen.Loses
 	for _, tier := range result.Ordered[1:] {
-		command, hop := CommandFor(tier.Name, host, inner, refs)
+		command, hop := CommandFor(tier.Name, subject.target(), inner, refs)
 		output.Alternatives = append(output.Alternatives, Alternative{
 			Tier: tier.Name, Rank: tier.Rank, Plan: command, Hop: hop, Gives: tier.Gives, Loses: tier.Loses,
 		})
@@ -133,9 +172,9 @@ func Build(host, session string, inner []string, refs Refs, result rank.Result, 
 }
 
 // Failure renders a ranking error, such as a pinned tier that is unavailable.
-func Failure(host, session string, err error, result rank.Result, probe Probe) Output {
+func Failure(subject Subject, err error, result rank.Result, probe Probe) Output {
 	return Output{
-		Version: Version, Host: host, Session: session, Status: "error", Error: err.Error(),
+		Version: Version, Host: subject.Host, Target: subject.Target, Session: subject.Session, Status: "error", Error: err.Error(),
 		Reasons: append([]string{}, result.Reasons...), Probe: probe,
 		Alternatives: []Alternative{}, Filtered: filtered(result),
 	}
