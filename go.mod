@@ -2,7 +2,7 @@ module github.com/roshbhatia/tether
 
 go 1.26
 
-require github.com/roshbhatia/go-utils v0.10.1
+require github.com/roshbhatia/go-utils v0.12.1
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
