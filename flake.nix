@@ -40,7 +40,7 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          version = "0.3.0";
+          version = "0.3.1";
           # Refresh with `nix build` after any go.mod or go.sum change; the
           # build prints the hash it expected.
           vendorHash = "sha256-ZLnyCDvIhS5mu8FCCTqQakqJ/5Smu3A/5058kh2jELE=";
