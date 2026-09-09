@@ -1,12 +1,26 @@
 # tether
 
-Transport negotiator. Given a host, an inner command, and what the caller can
-reach natively, `tether` picks the hop tool that carries the command and says
-what that hop loses. It never composes the inner command and never knows what
-`zmx` or `sy` are; it wraps the argv the caller passes after `--`.
+`tsh` is `ssh` with the hop negotiated. Type `tsh arrakis` where you typed
+`ssh arrakis` or `mosh arrakis`: it lands in a login shell over mosh when both
+ends have it, over plain ssh otherwise, and inside WezTerm it may open the
+host's native mux domain instead. One stderr line says which hop won.
 
-`tether connect <host>` is the verb that runs the hop: it probes when the host
-record is stale, ranks the tiers, and replaces itself with `mosh` or `ssh`.
+```bash
+tsh arrakis                          # login shell, like ssh arrakis
+tsh arrakis -- htop                  # a command, like ssh arrakis htop
+tsh -p 2222 -l ops arrakis           # ssh options ride the winning tier
+tsh -s sysinit arrakis               # attach the remote zmx (else tmux) session
+tsh -L 8080:localhost:80 arrakis     # a forward cannot ride mosh: ssh wins, and says why
+tsh --dry-run arrakis                # the tether.plan/v1 document, no connection
+```
+
+`tether` is the plumbing behind it, the way git's plumbing sits behind its
+porcelain: `tether connect` is `tsh` under another name, and `tether plan`,
+`probe`, `hosts`, and `status` are what a script or the WezTerm session tree
+call for the pieces. Given a host, an inner command, and what the caller can
+reach natively, `tether plan` picks the hop tool that carries the command and
+says what that hop loses. It never composes the inner command and never knows
+what `zmx` or `sy` are; it wraps the argv the caller passes after `--`.
 
 ## Tiers
 
@@ -24,40 +38,49 @@ on tier number.
 
 ## Connecting
 
-```bash
-tether connect arrakis                       # login shell over the best hop
-tether connect arrakis --session sysinit     # zmx attach sysinit (tmux new -A when zmx is absent)
-tether connect arrakis -- htop               # any inner argv after --
-tether connect arrakis --dry-run             # the tether.plan/v1 document, no connection
-tether connect arrakis --pin ssh             # exit 2 with the reasons when the pin is unavailable
-```
+`tsh` takes ssh's argv: options first, then `[user@]host`, then the remote
+command (a leading `--` is optional). Every ssh option is accepted; `tsh`
+keeps `-s` (session) and `-q` (quiet) for itself and adds `--pin`, `--mode`,
+`--dry-run`, and `--no-probe`.
 
-`connect` resolves the host, refuses an offline tailnet peer (exit 1, with its
-last-seen time), runs `tether probe` when the record is missing or older than
-10 minutes (`--no-probe` skips it), then ranks. One stderr line names the
-winner, `tether: mosh-mux -> arrakis (loses native-panes, osc, scrollback)`;
-`--quiet` drops it.
+It resolves the host, refuses an offline tailnet peer (exit 1, with its
+last-seen time), runs the probe when the record is missing or older than 10
+minutes (`--no-probe` skips it), then ranks. One stderr line names the winner,
+`tsh: mosh-mux -> arrakis (loses native-panes, osc, scrollback)`; `-q` drops
+it. A pinned tier that is unavailable exits 2 with the reasons and never falls
+back.
 
 - A `local` hop (`mosh-mux`, `ssh`) execs the plan command. The process is
   replaced and the exit status is the hop's.
 - A `native` hop (`native-mux`) is a WezTerm tab in the `ssh:<host>` mux
-  domain, opened with `wezterm cli spawn --domain-name`. `connect` passes
+  domain, opened with `wezterm cli spawn --domain-name`. `tsh` passes
   `--native ssh:<host>` only when it runs inside WezTerm (`WEZTERM_PANE` is
   set), `wezterm cli list` answers, and the host is an ssh config alias, since
   the GUI builds those domains from the ssh config. Native is a display
-  concept: from a plain terminal, `connect` is always a local hop. The remote
+  concept: from a plain terminal, `tsh` is always a local hop. The remote
   `wezterm-mux-server` spawns the inner argv itself, with its own PATH and in
   the remote home the probe recorded (`wezterm cli spawn` would otherwise hand
   it this pane's cwd, which does not exist over there).
-- With no inner argv the far side gets its login shell. With `--session S`, or
-  `defaults.session` in the config, it gets `zmx attach S` when the probe saw
-  `zmx` on the remote, else `tmux new -A -s S` when it saw `tmux`, else the
-  login shell and a stderr note. The mux is read from the host record, never
-  assumed.
+- With no command the far side gets its login shell, exactly like `ssh`. With
+  `-s S` it gets `zmx attach S` when the probe saw `zmx` on the remote, else
+  `tmux new -A -s S` when it saw `tmux`, else the login shell and a stderr
+  note. The mux is read from the host record, never assumed.
+
+### ssh options per tier
+
+| Tier | What the caller's ssh options become |
+| --- | --- |
+| `ssh` | Verbatim, before the host. A command gets `-t` unless the caller passed `-t` or `-T`. |
+| `mosh-mux` | `-l user` becomes `user@host`; the rest ride the bootstrap as `--ssh='ssh -p 2222 -i key ...'`; `-t` is implied. An option mosh cannot carry (`-L -R -D -W -w -J -A -X -Y -N -f -n -T -M -O -S -e -G -V -Q -g`) filters `mosh-mux` out with the reason, so `ssh` wins; under a pin it is an error instead. |
+| `native-mux`, `ssh-raw` | A WezTerm domain has its own ssh configuration, so any option other than `-t`, `-q`, `-v`, or a user override, filters both native tiers out with the reason. |
+
+The probe's own round trip uses the ssh config, not the caller's options: a
+host only reachable with `-p 2222` needs that port in `~/.ssh/config` for the
+inventory to be seen.
 
 ## Hosts and the tailnet
 
-`tether hosts` lists what `connect` can name: the literal `Host` entries of
+`tether hosts` lists what `tsh` can name: the literal `Host` entries of
 `~/.ssh/config` (following `Include`) and the peers of the tailnet from
 `tailscale status --json`, each marked `ssh-config`, `tailnet`, or `both`.
 `--json` writes `tether.hosts/v1`; `--names` feeds the completions.
@@ -98,7 +121,6 @@ the wrapper.
 {
   "mode": "auto",
   "flaky": { "rtt_ms": 60, "loss": 0 },
-  "defaults": { "session": "main" },
   "hosts": {
     "arrakis": { "pin": "mosh-mux" },
     "vault": { "user": "ops" }
@@ -106,8 +128,8 @@ the wrapper.
 }
 ```
 
-`defaults.session` is what `connect` attaches when `--session` is absent;
-`hosts.<name>.user` is prepended as `user@` to the ssh target.
+`hosts.<name>.user` is prepended as `user@` to the ssh target; `tsh -l` and
+`user@host` override it.
 
 ## Example
 
@@ -134,11 +156,14 @@ something other than `host`, such as `ops@vault.stork-eel.ts.net`.
 - Output contracts are versioned: `tether.plan/v1`, `tether.host/v1`,
   `tether.hosts/v1`, `tether.config/v1`. A host record of another version is a
   cache miss.
-- `connect` is the one verb that may do a round trip without being asked: the
-  user is about to connect anyway. `plan` never does.
-- `internal/hosts` resolves names; `connect`, `plan`, and `probe` all go
-  through it, so `tether probe --host arrakis.stork-eel.ts.net` and
-  `tether connect arrakis` share one host record.
+- `tsh` (`tether connect`) is the one verb that may do a round trip without
+  being asked: the user is about to connect anyway. `plan` never does.
+- `tsh` is a second `main` over the same command package, not an argv[0]
+  switch: a wrapper or `nix run` that rewrites argv[0] cannot turn it back
+  into `tether`, and the version ldflag lands in both binaries.
+- `internal/hosts` resolves names; `tsh`, `plan`, and `probe` all go through
+  it, so `tether probe --host arrakis.stork-eel.ts.net` and `tsh arrakis`
+  share one host record.
 - `schema/*.json`, `completions/*`, and the command section below are
   generated by `./hack/generate.sh` from the Go structs and the completion
   specification. CI runs `--check`; a stale artifact fails the build.
@@ -154,6 +179,30 @@ nix build
 nix flake check
 ```
 
+## tsh
+<!-- BEGIN GENERATED:tsh -->
+
+### `tsh`
+
+tsh [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]
+
+A drop-in for `ssh host` and `mosh host`: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and exec the winner. ssh options ride the ssh tier verbatim and the mosh tier through --ssh; one that mosh cannot carry (a port forward) filters mosh out with the reason.
+
+| Option | Description |
+| --- | --- |
+| `--session`, `-s` `<value>` | Attach this remote mux session (zmx, else tmux) instead of a login shell |
+| `--quiet`, `-q` | Do not announce the winning hop on stderr |
+| `--login`, `-l` `<value>` | Remote user, as ssh -l |
+| `--port`, `-p` `<value>` | Remote port, as ssh -p |
+| `--mode` `<value>` | Ordering mode; overrides the config |
+| `--pin` `<value>` | Tier that must win; overrides the config |
+| `--dry-run` | Write the tether.plan/v1 document and exit without connecting |
+| `--no-probe` | Never run the ssh round trip; plan from the cache only |
+| `--version` | Write the version to stdout |
+| `--help`, `-h` | Print command help |
+
+<!-- END GENERATED:tsh -->
+
 ## Commands
 <!-- BEGIN GENERATED:commands -->
 
@@ -161,7 +210,7 @@ nix flake check
 
 tether [--version] <connect|plan|probe|hosts|status|completion>
 
-Resolve which transport carries an inner command to a host, from what both ends have installed, and run it. connect execs the hop; plan, probe, hosts --json, and status write JSON.
+The plumbing behind tsh. Resolve which transport carries a command to a host, from what both ends have installed. connect execs the hop; plan, probe, hosts --json, and status write JSON.
 
 | Option | Description |
 | --- | --- |
@@ -170,18 +219,21 @@ Resolve which transport carries an inner command to a host, from what both ends 
 
 ### `tether connect`
 
-tether connect <host> [--session <name>] [--mode <mode>] [--pin <tier>] [--dry-run] [--quiet] [--no-probe] [-- <inner argv>]
+tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]
 
-Resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Inside WezTerm an ssh-config host may win native-mux, which opens a tab in the ssh:<host> domain instead.
+Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Inside WezTerm an ssh-config host may win native-mux, which opens a tab in the ssh:<host> domain instead.
 
 | Option | Description |
 | --- | --- |
-| `--session` `<value>` | Session to attach with zmx or tmux when no inner argv is given; overrides defaults.session |
+| `--session`, `-s` `<value>` | Attach this remote mux session (zmx, else tmux) instead of a login shell |
+| `--quiet`, `-q` | Do not announce the winning hop on stderr |
+| `--login`, `-l` `<value>` | Remote user, as ssh -l |
+| `--port`, `-p` `<value>` | Remote port, as ssh -p |
 | `--mode` `<value>` | Ordering mode; overrides the config |
 | `--pin` `<value>` | Tier that must win; overrides the config |
-| `--dry-run` | Write the plan JSON and exit without connecting |
-| `--quiet` | Do not announce the winning hop on stderr |
+| `--dry-run` | Write the tether.plan/v1 document and exit without connecting |
 | `--no-probe` | Never run the ssh round trip; plan from the cache only |
+| `--version` | Write the version to stdout |
 | `--help`, `-h` | Print command help |
 
 ### `tether plan`
