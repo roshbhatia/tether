@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 import hashlib
 import json
 import pathlib
@@ -38,10 +42,13 @@ def main():
         text += "Install the core utility separately, or select its all-provider bundle. Runtime tools still need their own credentials.\n\n"
         if data.get("runtime_note"):
             text += data["runtime_note"] + "\n\n"
-        text += "## Demo\n\n![" + data["summary"] + "](demo.gif)\n\n[Tape source](demo.tape) · [Task script](demo.sh)\n\n"
-        text += "Run `nix develop -c bash extras/" + extra + "/demo.sh` to run the task without recording.\n"
-        text += "Run `nix develop -c python3 hack/extra-demos.py " + extra + "` to record it.\n"
-        write(directory / "README.md", text)
+        if data.get("status") == "pending":
+            text += "## Demo\n\nRecording pending. The previous script printed adapter output without exercising WezTerm.\n\n[Tape source](demo.tape)\n\n"
+        else:
+            text += "## Demo\n\n![" + data["summary"] + "](demo.gif)\n\n[Tape source](demo.tape) · [Task script](demo.sh)\n\n"
+            text += "Run `nix develop -c bash extras/" + extra + "/demo.sh` to run the task without recording.\n"
+            text += "Run `nix develop -c uv run --offline --no-managed-python --no-python-downloads --python python3 --script hack/extra-demos.py " + extra + "` to record it.\n"
+        write(directory / "README.md", text.rstrip() + "\n")
         entries.append(data)
         manifest = next((directory / name for name in ('provider.yaml', 'provider.json') if (directory / name).is_file()), None)
         kind = 'provider' if manifest else 'tool'

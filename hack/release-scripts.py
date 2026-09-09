@@ -1,8 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Build portable adapter archives from the generated package index."""
 import argparse
 import hashlib
 import io
+import os
+import tempfile
 import json
 from pathlib import Path
 import tarfile
@@ -33,14 +39,11 @@ index = json.loads((ROOT / 'package-index.json').read_text())
 for entry, metadata in zip(index['packages'], index['providers'], strict=True):
     directory = ROOT / 'extras' / metadata['name']
     files = {}
-    executable = directory / 'provider.py'
-    if executable.is_file():
-        files[entry['binary']] = (b'#!/usr/bin/env python3\n' + executable.read_bytes(), 0o755)
-    else:
-        files[entry['binary']] = ((directory / 'provider.sh').read_bytes(), 0o755)
-        files['lib/provider.sh'] = ((ROOT / 'extras/lib/provider.sh').read_bytes(), 0o644)
-        if (directory / 'process_tree.py').is_file():
-            files['lib/process_tree.py'] = ((directory / 'process_tree.py').read_bytes(), 0o644)
+    with tempfile.TemporaryDirectory() as temporary:
+        binary = Path(temporary) / entry['binary']
+        environment = os.environ | {'GOOS': args.os, 'GOARCH': args.arch, 'CGO_ENABLED': '0'}
+        subprocess.run(['go', 'build', '-trimpath', '-ldflags=-s -w', '-o', str(binary), './extras/' + metadata['name']], cwd=ROOT, env=environment, check=True)
+        files[entry['binary']] = (binary.read_bytes(), 0o755)
     files['README.md'] = ((directory / 'README.md').read_bytes(), 0o644)
     if (ROOT / 'LICENSE').is_file():
         files['LICENSE'] = ((ROOT / 'LICENSE').read_bytes(), 0o644)

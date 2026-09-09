@@ -1,10 +1,22 @@
 { pkgs, core }:
 let
-  executable = pkgs.writeShellApplication {
-    name = "tether-picker";
-    runtimeInputs = [ pkgs.python3 ];
-    text = "exec python3 ${./provider.py} ${pkgs.lib.getExe core}";
-  };
+  executable = core.overrideAttrs (old: {
+    pname = "tether-picker";
+    subPackages = [ "extras/wezterm" ];
+    nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
+    checkPhase = ''
+      runHook preCheck
+      go test -race ./extras/wezterm
+      runHook postCheck
+    '';
+    postInstall = ''
+      mv "$out/bin/wezterm" "$out/bin/tether-picker"
+      wrapProgram "$out/bin/tether-picker" --add-flags "${pkgs.lib.getExe core}"
+    '';
+    meta = old.meta // {
+      mainProgram = "tether-picker";
+    };
+  });
   manifest = pkgs.writeText "tether.json" (
     builtins.toJSON (
       (builtins.fromJSON (builtins.readFile ./provider.json))

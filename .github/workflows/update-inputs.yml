@@ -25,9 +25,9 @@ jobs:
         run: nix flake check -L
       - name: Refresh extra documentation
         run: |
-          python3 hack/extra-docs.py
-          if ! python3 hack/extra-demos.py --check; then
-            nix develop --accept-flake-config -c python3 hack/extra-demos.py
+          nix develop --accept-flake-config -c uv run --offline --no-managed-python --no-python-downloads --python python3 --script hack/extra-docs.py
+          if ! nix develop --accept-flake-config -c uv run --offline --no-managed-python --no-python-downloads --python python3 --script hack/extra-demos.py --check; then
+            nix develop --accept-flake-config -c uv run --offline --no-managed-python --no-python-downloads --python python3 --script hack/extra-demos.py
           fi
 
       - uses: peter-evans/create-pull-request@v8

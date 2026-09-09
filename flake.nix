@@ -155,6 +155,7 @@
         {
           default = pkgs.mkShellNoCC {
             packages = [
+              pkgs.uv
               pkgs.python3
               pkgs.vhs
               pkgs.ffmpeg

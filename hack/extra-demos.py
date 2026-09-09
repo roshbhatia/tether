@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 import hashlib
 import json
 import pathlib
@@ -11,7 +15,7 @@ def fingerprint(directory):
     metadata = json.loads((directory / "demo.json").read_text())
     visible = {key: metadata[key] for key in ("name", "summary", "replay", "core", "binary")}
     digest = hashlib.sha256(json.dumps(visible, sort_keys=True).encode())
-    sources = {directory / "demo.tape", directory / "demo.sh", ROOT / "hack/demo-extra.py", ROOT / "hack/extra-demos.py"}
+    sources = {directory / "demo.tape", directory / "demo.sh", ROOT / "hack/extra-demos.py"}
     for name in ("go.mod", "go.sum", "Cargo.toml", "Cargo.lock", "flake.lock", "extras/demo.py"):
         path = ROOT / name
         if path.is_file():
@@ -35,6 +39,11 @@ check = "--check" in sys.argv
 selected = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
 for directory in sorted((ROOT / "extras").iterdir()):
     if not (directory / "demo.json").is_file() or selected and directory.name not in selected:
+        continue
+    metadata = json.loads((directory / "demo.json").read_text())
+    if metadata.get("status") == "pending":
+        if selected and not check:
+            raise SystemExit("recording pending: " + directory.name)
         continue
     stamp = directory / ".demo.sha256"
     if check:

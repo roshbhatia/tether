@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-cd "$root"
-exec python3 hack/demo-extra.py wezterm
+printf '%s\n' 'Recording pending: capture the real WezTerm selector and open action.' >&2
+exit 1

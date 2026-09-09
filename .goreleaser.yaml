@@ -3,7 +3,7 @@ project_name: tether
 
 before:
   hooks:
-    - python3 hack/release-scripts.py --version {{ .Version }} --all --output .release-extras
+    - nix develop -c uv run --offline --no-managed-python --no-python-downloads --python python3 --script hack/release-scripts.py --version {{ .Version }} --all --output .release-extras
     - ./hack/generate.sh --check
 
 builds:
