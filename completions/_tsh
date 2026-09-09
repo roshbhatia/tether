@@ -1,0 +1,80 @@
+#compdef tsh
+__tsh_completion_values_0() {
+  local -a values
+  values=( 'auto' 'native' 'roam' 'persist')
+  compadd -a values
+}
+__tsh_completion_values_1() {
+  local -a values
+  values=( 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh')
+  compadd -a values
+}
+__tsh_completion_values_2() {
+  local -a values
+  values=( 'completion')
+  values+=("${(@f)$('tether' 'hosts' '--names' 2>/dev/null)}")
+  compadd -a values
+}
+
+_tsh() {
+  local context=''
+  local word
+  local consume_value=0
+  local options_done=0
+  for word in ${words[2,$((CURRENT - 1))]}; do
+    if (( consume_value )); then
+      consume_value=0
+      continue
+    fi
+    if (( options_done )); then
+      continue
+    fi
+    if [[ "$word" == '--' ]]; then
+      options_done=1
+      continue
+    fi
+    case "$context:$word" in
+      ':--login') consume_value=1; continue ;;
+      ':--login='*) continue ;;
+      ':-l') consume_value=1; continue ;;
+      ':-l='*) continue ;;
+      ':--mode') consume_value=1; continue ;;
+      ':--mode='*) continue ;;
+      ':--pin') consume_value=1; continue ;;
+      ':--pin='*) continue ;;
+      ':--port') consume_value=1; continue ;;
+      ':--port='*) continue ;;
+      ':-p') consume_value=1; continue ;;
+      ':-p='*) continue ;;
+      ':--session') consume_value=1; continue ;;
+      ':--session='*) continue ;;
+      ':-s') consume_value=1; continue ;;
+      ':-s='*) continue ;;
+    esac
+    case "$context:$word" in
+      ':completion') context='completion' ;;
+    esac
+  done
+  case "$context" in
+    '')
+      _arguments \
+        '--dry-run[Write the tether.plan/v1 document and exit without connecting]' \
+        '(-h)--help[Print command help]' \
+        '(-l)--login[Remote user, as ssh -l]:value:' \
+        '--mode[Ordering mode; overrides the config]:value:__tsh_completion_values_0' \
+        '--no-probe[Never run the ssh round trip; plan from the cache only]' \
+        '--pin[Tier that must win; overrides the config]:value:__tsh_completion_values_1' \
+        '(-p)--port[Remote port, as ssh -p]:value:' \
+        '(-q)--quiet[Do not announce the winning hop on stderr]' \
+        '(-s)--session[Attach this remote mux session (zmx, else tmux) instead of a login shell]:value:' \
+        '--version[Write the version to stdout]' \
+        '*:argument:__tsh_completion_values_2'
+
+      ;;
+    'completion')
+      _arguments \
+        '2:shell:(bash zsh fish nu)'
+      ;;
+  esac
+}
+compdef _tsh tsh

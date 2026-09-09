@@ -83,9 +83,18 @@ type Refs struct {
 	NativeRaw string
 }
 
+// Flags are the caller's transport options, already mapped per tool: SSH is
+// placed verbatim before the ssh host; Mosh (such as `--ssh=ssh -p 2222`)
+// before the mosh host. TTY set means the caller decided about -t.
+type Flags struct {
+	SSH  []string
+	Mosh []string
+	TTY  bool
+}
+
 // CommandFor wraps the inner argv for one tier. tether never composes the
 // inner command; it only decides the hop that carries it.
-func CommandFor(tier, host string, inner []string, refs Refs) (CommandPlan, Hop) {
+func CommandFor(tier, host string, inner []string, refs Refs, flags Flags) (CommandPlan, Hop) {
 	command := CommandPlan{Environment: map[string]string{}, SuccessCodes: []int{0}}
 	switch tier {
 	case rank.NativeMux:
@@ -97,11 +106,18 @@ func CommandFor(tier, host string, inner []string, refs Refs) (CommandPlan, Hop)
 	case rank.MoshMux:
 		// mosh keeps the argv: it quotes the words for the remote login shell
 		// itself and mosh-server execs them without a shell.
-		command.Command = wrap([]string{"mosh", host}, inner)
+		prefix := append(append([]string{"mosh"}, flags.Mosh...), host)
+		command.Command = wrap(prefix, inner)
 	default:
 		// ssh joins the words with spaces for the remote login shell, so each
 		// one is quoted here or `sh -c 'echo $(hostname)'` arrives unquoted.
-		command.Command = wrap([]string{"ssh", "-t", host}, quoteAll(inner))
+		// A command gets a tty like an interactive session, unless the caller
+		// passed -t or -T.
+		prefix := append([]string{"ssh"}, flags.SSH...)
+		if len(inner) > 0 && !flags.TTY {
+			prefix = append(prefix, "-t")
+		}
+		command.Command = wrap(append(prefix, host), quoteAll(inner))
 	}
 	return command, Hop{Kind: "local"}
 }
@@ -136,6 +152,7 @@ type Subject struct {
 	Host    string
 	Target  string
 	Session string
+	Flags   Flags
 }
 
 func (subject Subject) target() string {
@@ -156,14 +173,14 @@ func Build(subject Subject, inner []string, refs Refs, result rank.Result, probe
 		return output
 	}
 	chosen := result.Ordered[0]
-	command, hop := CommandFor(chosen.Name, subject.target(), inner, refs)
+	command, hop := CommandFor(chosen.Name, subject.target(), inner, refs, subject.Flags)
 	output.Chosen = &Chosen{Tier: chosen.Name, Rank: chosen.Rank}
 	output.Plan = &command
 	output.Hop = &hop
 	output.Gives = chosen.Gives
 	output.Loses = chosen.Loses
 	for _, tier := range result.Ordered[1:] {
-		command, hop := CommandFor(tier.Name, subject.target(), inner, refs)
+		command, hop := CommandFor(tier.Name, subject.target(), inner, refs, subject.Flags)
 		output.Alternatives = append(output.Alternatives, Alternative{
 			Tier: tier.Name, Rank: tier.Rank, Plan: command, Hop: hop, Gives: tier.Gives, Loses: tier.Loses,
 		})

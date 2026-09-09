@@ -7,124 +7,99 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/roshbhatia/go-utils/completion"
 	"github.com/roshbhatia/tether/internal/config"
 	"github.com/roshbhatia/tether/internal/hosts"
 	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
 )
 
-// connectOptions are the connect flags. The host is positional and the flags
-// may follow it, so the flag set is parsed twice.
-type connectOptions struct {
-	host    string
-	session string
-	mode    string
-	pin     string
-	dryRun  bool
-	quiet   bool
-	noProbe bool
-	inner   []string
-}
-
-func parseConnect(args []string, streams Streams) (connectOptions, int, bool) {
-	spec := subcommand("connect")
-	flags := newFlagSet(spec, streams)
-	var options connectOptions
-	flags.StringVar(&options.session, "session", "", "")
-	flags.StringVar(&options.mode, "mode", "", "")
-	flags.StringVar(&options.pin, "pin", "", "")
-	flags.BoolVar(&options.dryRun, "dry-run", false, "")
-	flags.BoolVar(&options.quiet, "quiet", false, "")
-	flags.BoolVar(&options.noProbe, "no-probe", false, "")
-	if err := flags.Parse(args); err != nil {
-		return options, usageExit(err), false
-	}
-	rest := flags.Args()
-	if len(rest) == 0 || rest[0] == "--" || onlyInner(args, rest) {
-		fmt.Fprintln(streams.Stderr, "tether connect: a host is required")
-		flags.Usage()
-		return options, 2, false
-	}
-	options.host, rest = rest[0], rest[1:]
-	if len(rest) > 0 && rest[0] != "--" && strings.HasPrefix(rest[0], "-") {
-		if err := flags.Parse(rest); err != nil {
-			return options, usageExit(err), false
-		}
-		rest = flags.Args()
-	} else if len(rest) > 0 && rest[0] == "--" {
-		rest = rest[1:]
-	}
-	options.inner = rest
-	return options, 0, true
-}
-
-// onlyInner reports whether every remaining argument follows a --, so no
-// host was named. flag.Parse drops the -- itself.
-func onlyInner(args, rest []string) bool {
-	for i, arg := range args {
-		if arg == "--" {
-			return len(rest) == len(args)-i-1
-		}
-	}
-	return false
+// RunTSH is the tsh entry point: `tsh <args>` is `tether connect <args>`
+// announcing itself as tsh.
+func RunTSH(args []string, streams Streams) int {
+	return connect("tsh", args, streams, tshSpecification)
 }
 
 func runConnect(args []string, streams Streams) int {
-	options, code, ok := parseConnect(args, streams)
-	if !ok {
-		return code
+	return connect("tether connect", args, streams, subcommand("connect"))
+}
+
+// connect parses an ssh-shaped argv, resolves and probes the host, ranks the
+// tiers, and realizes the winner. prog prefixes every diagnostic.
+func connect(prog string, args []string, streams Streams, spec completion.Command) int {
+	options, err := parseTSH(args)
+	if err != nil {
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
+		_, _ = fmt.Fprint(streams.Stderr, completion.Text(spec))
+		return 2
+	}
+	if options.help {
+		_, _ = fmt.Fprint(streams.Stderr, completion.Text(spec))
+		return 0
+	}
+	if options.version {
+		fmt.Fprintln(streams.Stdout, streams.Version)
+		return 0
 	}
 	settings, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(streams.Stderr, "tether connect: %v\n", err)
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
 		return 1
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	tools := streams.tools()
+	say := func(format string, values ...any) {
+		if !options.quiet {
+			fmt.Fprintf(streams.Stderr, prog+": "+format+"\n", values...)
+		}
+	}
 
 	target, known := streams.resolver(settings).Resolve(ctx, options.host)
-	if !known && !options.quiet {
-		fmt.Fprintf(streams.Stderr, "tether: %s is not in the ssh config and not a tailnet peer; trying ssh anyway\n", options.host)
+	if !known {
+		say("%s is not in the ssh config and not a tailnet peer; trying ssh anyway", options.host)
+	}
+	if options.user != "" {
+		target.User = options.user
+		target.Target = withUser(options.user, target.Target)
 	}
 	if target.Peer != nil && !target.Peer.Online {
-		fmt.Fprintf(streams.Stderr, "tether: %s is offline on the tailnet (%s)\n", target.Name, lastSeen(*target.Peer))
+		fmt.Fprintf(streams.Stderr, "%s: %s is offline on the tailnet (%s)\n", prog, target.Name, lastSeen(*target.Peer))
 		return 1
 	}
 
 	record, cached, err := probe.Read(target.Name)
 	if err != nil {
-		fmt.Fprintf(streams.Stderr, "tether connect: %v\n", err)
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
 		return 1
 	}
 	if !options.noProbe && (!cached || record.Stale(tools.Now())) {
-		if !options.quiet {
-			fmt.Fprintf(streams.Stderr, "tether: probing %s\n", target.Name)
-		}
+		say("probing %s", target.Name)
 		probed, err := probe.Run(ctx, tools, target.Name, probe.Options{Target: target.Target})
 		if err != nil {
-			fmt.Fprintf(streams.Stderr, "tether: probe failed: %v\n", err)
+			say("probe failed: %v", err)
 		} else {
 			record, cached = probed, true
 		}
 	}
 
-	session := options.session
-	if session == "" {
-		session = settings.Defaults.Session
+	inner, note := defaultInner(options.command, options.session, target.Name, record.Remote, cached)
+	if note != "" {
+		say("%s", note)
 	}
-	inner, note := defaultInner(options.inner, session, target.Name, record.Remote, cached)
-	if note != "" && !options.quiet {
-		fmt.Fprintln(streams.Stderr, "tether: "+note)
+	flags := carry(options.options, options.user != "")
+	req := request{
+		Session: options.session, Mode: options.mode, Pin: options.pin, Inner: inner,
+		Flags:       plan.Flags{SSH: flags.ssh, Mosh: flags.mosh, TTY: flags.tty},
+		MoshUnfit:   flags.moshUnfit,
+		NativeUnfit: flags.nativeUnfit,
 	}
-
-	req := request{Session: session, Mode: options.mode, Pin: options.pin, Inner: inner}
 	if ref, ok := nativeRef(ctx, streams, tools, target); ok {
 		req.Native = ref
 	}
 	output, err := rankHost(ctx, streams, settings, target, req)
 	if err != nil && !isRankError(err) {
-		fmt.Fprintf(streams.Stderr, "tether connect: %v\n", err)
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
 		return 1
 	}
 	if options.dryRun {
@@ -137,13 +112,13 @@ func runConnect(args []string, streams Streams) int {
 		return 0
 	}
 	if err != nil {
-		fmt.Fprintf(streams.Stderr, "tether: %v\n", err)
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
 		for _, reason := range output.Reasons {
 			fmt.Fprintln(streams.Stderr, "  "+reason)
 		}
 		return 2
 	}
-	return realize(ctx, streams, tools, output, record.Remote.Home, options.quiet)
+	return realize(ctx, prog, streams, tools, output, record.Remote.Home, options.quiet)
 }
 
 func lastSeen(peer probe.Peer) string {
@@ -153,9 +128,10 @@ func lastSeen(peer probe.Peer) string {
 	return "last seen " + peer.LastSeen.UTC().Format("2006-01-02T15:04:05Z")
 }
 
-// defaultInner picks the far-side command when the caller gave none. A
-// session attaches through whatever mux the probe saw on the remote; with
-// none, the hop opens its login shell and the note says why.
+// defaultInner picks the far-side command when the caller gave none: a login
+// shell, exactly like ssh, unless a session was asked for. A session attaches
+// through whatever mux the probe saw on the remote; with none, the hop opens
+// the login shell and the note says why.
 func defaultInner(inner []string, session, host string, remote probe.Remote, known bool) ([]string, string) {
 	if len(inner) > 0 {
 		return inner, ""
@@ -200,9 +176,9 @@ func nativeRef(ctx context.Context, streams Streams, tools probe.Tools, target h
 // spawns a native command itself, and `wezterm cli spawn` would hand it this
 // pane's cwd, which does not exist over there, so the remote home (or /) is
 // passed instead.
-func realize(ctx context.Context, streams Streams, tools probe.Tools, output plan.Output, remoteHome string, quiet bool) int {
+func realize(ctx context.Context, prog string, streams Streams, tools probe.Tools, output plan.Output, remoteHome string, quiet bool) int {
 	if output.Plan == nil || output.Hop == nil {
-		fmt.Fprintln(streams.Stderr, "tether: plan has no command")
+		fmt.Fprintf(streams.Stderr, "%s: plan has no command\n", prog)
 		return 1
 	}
 	loses := ""
@@ -213,7 +189,7 @@ func realize(ctx context.Context, streams Streams, tools probe.Tools, output pla
 	case "native":
 		wezterm, err := tools.LookPath("wezterm")
 		if err != nil || tools.Run == nil {
-			fmt.Fprintln(streams.Stderr, "tether: native hop chosen but wezterm is absent")
+			fmt.Fprintf(streams.Stderr, "%s: native hop chosen but wezterm is absent\n", prog)
 			return 1
 		}
 		args := []string{"cli", "spawn", "--domain-name", output.Hop.Ref}
@@ -231,33 +207,33 @@ func realize(ctx context.Context, streams Streams, tools probe.Tools, output pla
 			if message == "" {
 				message = err.Error()
 			}
-			fmt.Fprintf(streams.Stderr, "tether: wezterm cli spawn --domain-name %s: %s\n", output.Hop.Ref, message)
+			fmt.Fprintf(streams.Stderr, "%s: wezterm cli spawn --domain-name %s: %s\n", prog, output.Hop.Ref, message)
 			return 1
 		}
 		if !quiet {
-			fmt.Fprintf(streams.Stderr, "tether: %s -> %s in %s, pane %s%s\n", output.Chosen.Tier, output.Host, output.Hop.Ref, strings.TrimSpace(string(out)), loses)
+			fmt.Fprintf(streams.Stderr, "%s: %s -> %s in %s, pane %s%s\n", prog, output.Chosen.Tier, output.Host, output.Hop.Ref, strings.TrimSpace(string(out)), loses)
 		}
 		return 0
 	case "local":
 		if len(output.Plan.Command) == 0 {
-			fmt.Fprintln(streams.Stderr, "tether: plan has no command")
+			fmt.Fprintf(streams.Stderr, "%s: plan has no command\n", prog)
 			return 1
 		}
 		path, err := tools.LookPath(output.Plan.Command[0])
 		if err != nil {
-			fmt.Fprintf(streams.Stderr, "tether: %s: %v\n", output.Plan.Command[0], err)
+			fmt.Fprintf(streams.Stderr, "%s: %s: %v\n", prog, output.Plan.Command[0], err)
 			return 1
 		}
 		if !quiet {
-			fmt.Fprintf(streams.Stderr, "tether: %s -> %s%s\n", output.Chosen.Tier, output.Host, loses)
+			fmt.Fprintf(streams.Stderr, "%s: %s -> %s%s\n", prog, output.Chosen.Tier, output.Host, loses)
 		}
 		if err := streams.exec(path, output.Plan.Command, os.Environ()); err != nil {
-			fmt.Fprintf(streams.Stderr, "tether: exec %s: %v\n", path, err)
+			fmt.Fprintf(streams.Stderr, "%s: exec %s: %v\n", prog, path, err)
 			return 1
 		}
 		return 0
 	default:
-		fmt.Fprintf(streams.Stderr, "tether: unknown hop kind %q\n", output.Hop.Kind)
+		fmt.Fprintf(streams.Stderr, "%s: unknown hop kind %q\n", prog, output.Hop.Kind)
 		return 1
 	}
 }

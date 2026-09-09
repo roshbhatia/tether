@@ -33,7 +33,7 @@ var specification = completion.Command{
 	Name:            "tether",
 	Description:     "Pick the hop that carries a remote session",
 	Synopsis:        "tether [--version] <connect|plan|probe|hosts|status|completion>",
-	LongDescription: "Resolve which transport carries an inner command to a host, from what both ends have installed, and run it. connect execs the hop; plan, probe, hosts --json, and status write JSON.",
+	LongDescription: "The plumbing behind tsh. Resolve which transport carries a command to a host, from what both ends have installed. connect execs the hop; plan, probe, hosts --json, and status write JSON.",
 	Flags: []completion.Flag{
 		{Name: "version", Description: "Write the version to stdout"},
 		{Name: "help", Short: "h", Description: "Print command help"},
@@ -41,19 +41,11 @@ var specification = completion.Command{
 	Subcommands: []completion.Command{
 		{
 			Name:              "connect",
-			Description:       "Probe if needed, plan, then exec the hop",
-			Synopsis:          "tether connect <host> [--session <name>] [--mode <mode>] [--pin <tier>] [--dry-run] [--quiet] [--no-probe] [-- <inner argv>]",
-			LongDescription:   "Resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Inside WezTerm an ssh-config host may win native-mux, which opens a tab in the ssh:<host> domain instead.",
+			Description:       "The plumbing behind tsh: negotiate the hop and exec it",
+			Synopsis:          "tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]",
+			LongDescription:   "Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Inside WezTerm an ssh-config host may win native-mux, which opens a tab in the ssh:<host> domain instead.",
 			CompletionCommand: []string{"tether", "hosts", "--names"},
-			Flags: []completion.Flag{
-				{Name: "session", Description: "Session to attach with zmx or tmux when no inner argv is given; overrides defaults.session", Value: true},
-				{Name: "mode", Description: "Ordering mode; overrides the config", Value: true, Values: modeNames},
-				{Name: "pin", Description: "Tier that must win; overrides the config", Value: true, Values: tierNames},
-				{Name: "dry-run", Description: "Write the plan JSON and exit without connecting"},
-				{Name: "quiet", Description: "Do not announce the winning hop on stderr"},
-				{Name: "no-probe", Description: "Never run the ssh round trip; plan from the cache only"},
-				{Name: "help", Short: "h", Description: "Print command help"},
-			},
+			Flags:             tshSpecification.Flags,
 		},
 		{
 			Name:            "plan",
@@ -253,12 +245,15 @@ func runPlan(args []string, streams Streams) int {
 
 // request is one plan: the caller's refs and overrides plus the inner argv.
 type request struct {
-	Session   string
-	Native    string
-	NativeRaw string
-	Mode      string
-	Pin       string
-	Inner     []string
+	Session     string
+	Native      string
+	NativeRaw   string
+	Mode        string
+	Pin         string
+	Inner       []string
+	Flags       plan.Flags
+	MoshUnfit   string
+	NativeUnfit string
 }
 
 // rankError marks a ranking failure, such as an unavailable pin, whose plan
@@ -305,6 +300,8 @@ func rankHost(ctx context.Context, streams Streams, settings config.Config, targ
 		RegistryOffline: registry.Present && registry.Peer && !registry.Online,
 		NativeRef:       req.Native,
 		NativeRawRef:    req.NativeRaw,
+		MoshUnfit:       req.MoshUnfit,
+		NativeUnfit:     req.NativeUnfit,
 	}
 	link := rank.Link{}
 	probeInfo := plan.Probe{Stale: true}
@@ -337,7 +334,7 @@ func rankHost(ctx context.Context, streams Streams, settings config.Config, targ
 	if result.Offline {
 		probeInfo.Stale = true
 	}
-	subject := plan.Subject{Host: target.Name, Session: req.Session}
+	subject := plan.Subject{Host: target.Name, Session: req.Session, Flags: req.Flags}
 	if target.Target != target.Name {
 		subject.Target = target.Target
 	}

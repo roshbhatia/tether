@@ -93,6 +93,13 @@ type Caps struct {
 	NativeRef string
 	// NativeRawRef is the caller's opaque raw ssh-domain ref; "" means none.
 	NativeRawRef string
+
+	// MoshUnfit is why the caller's ssh options cannot ride mosh (a port
+	// forward needs the ssh session mosh closes); "" means they can.
+	MoshUnfit string
+	// NativeUnfit is why the caller's ssh options cannot reach a native
+	// domain, which has its own ssh configuration; "" means they can.
+	NativeUnfit string
 }
 
 // Link is the fresh link sample; Known is false when there is none.
@@ -215,6 +222,9 @@ func unavailable(tier Tier, caps Caps, offline bool) string {
 	}
 	switch tier.Name {
 	case NativeMux:
+		if caps.NativeUnfit != "" {
+			missing = append(missing, caps.NativeUnfit)
+		}
 		if !caps.LocalWezterm {
 			missing = append(missing, "local wezterm absent")
 		}
@@ -227,6 +237,9 @@ func unavailable(tier Tier, caps Caps, offline bool) string {
 			missing = append(missing, "no native ref (--native)")
 		}
 	case MoshMux:
+		if caps.MoshUnfit != "" {
+			missing = append(missing, caps.MoshUnfit)
+		}
 		if !caps.LocalMosh {
 			missing = append(missing, "local mosh absent")
 		}
@@ -241,6 +254,9 @@ func unavailable(tier Tier, caps Caps, offline bool) string {
 			}
 		}
 	case SSHRaw:
+		if caps.NativeUnfit != "" {
+			missing = append(missing, caps.NativeUnfit)
+		}
 		if !caps.LocalSSH {
 			missing = append(missing, "local ssh absent")
 		}

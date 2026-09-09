@@ -78,10 +78,10 @@ func TestEnvironmentOverridesFlakyThreshold(t *testing.T) {
 	}
 }
 
-func TestLoadReadsDefaultsSessionAndHostUser(t *testing.T) {
+func TestLoadReadsHostUser(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
-	if err := os.WriteFile(path, []byte(`{"defaults":{"session":"main"},"hosts":{"vault":{"user":"ops"}}}`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"hosts":{"vault":{"user":"ops"}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("TETHER_CONFIG", path)
@@ -89,7 +89,7 @@ func TestLoadReadsDefaultsSessionAndHostUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Defaults.Session != "main" || loaded.UserFor("vault") != "ops" || loaded.UserFor("other") != "" {
+	if loaded.UserFor("vault") != "ops" || loaded.UserFor("other") != "" {
 		t.Fatalf("loaded: %+v", loaded)
 	}
 	if loaded.Mode != ModeAuto || loaded.Flaky.RTTMs != 60 {

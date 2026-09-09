@@ -70,6 +70,16 @@ _tether_complete() {
     case "$context:$word" in
       'connect:--session') consume_value=1; continue ;;
       'connect:--session='*) continue ;;
+      'connect:-s') consume_value=1; continue ;;
+      'connect:-s='*) continue ;;
+      'connect:--login') consume_value=1; continue ;;
+      'connect:--login='*) continue ;;
+      'connect:-l') consume_value=1; continue ;;
+      'connect:-l='*) continue ;;
+      'connect:--port') consume_value=1; continue ;;
+      'connect:--port='*) continue ;;
+      'connect:-p') consume_value=1; continue ;;
+      'connect:-p='*) continue ;;
       'connect:--mode') consume_value=1; continue ;;
       'connect:--mode='*) continue ;;
       'connect:--pin') consume_value=1; continue ;;
@@ -132,7 +142,7 @@ _tether_complete() {
       ;;
     'connect')
       __tether_completion_filter "$current" < <(
-        printf '%s\n' '--session' '--mode' '--pin' '--dry-run' '--quiet' '--no-probe' '--help' '-h'
+        printf '%s\n' '--session' '-s' '--quiet' '-q' '--login' '-l' '--port' '-p' '--mode' '--pin' '--dry-run' '--no-probe' '--version' '--help' '-h'
         __tether_completion_values_0
       )
       ;;

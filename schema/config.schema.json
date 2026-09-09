@@ -1,16 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "Defaults": {
-      "properties": {
-        "session": {
-          "type": "string",
-          "description": "Session connect attaches when --session is absent; empty means a login shell"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
     "Flaky": {
       "properties": {
         "rtt_ms": {
@@ -74,9 +64,6 @@
     "flaky": {
       "$ref": "#/$defs/Flaky"
     },
-    "defaults": {
-      "$ref": "#/$defs/Defaults"
-    },
     "hosts": {
       "additionalProperties": {
         "$ref": "#/$defs/Host"
@@ -88,8 +75,7 @@
   "type": "object",
   "required": [
     "mode",
-    "flaky",
-    "defaults"
+    "flaky"
   ],
   "title": "tether.config/v1"
 }

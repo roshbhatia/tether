@@ -24,7 +24,7 @@ func TestCommandForWrapsAndNeverComposes(t *testing.T) {
 		{rank.SSH, []string{"ssh", "-t", "arrakis", "--", "zmx", "attach", "sysinit"}, Hop{Kind: "local"}},
 	}
 	for _, row := range rows {
-		command, hop := CommandFor(row.tier, "arrakis", inner, refs)
+		command, hop := CommandFor(row.tier, "arrakis", inner, refs, Flags{})
 		if !reflect.DeepEqual(command.Command, row.command) || hop != row.hop {
 			t.Fatalf("%s: command %v hop %+v", row.tier, command.Command, hop)
 		}
@@ -32,7 +32,7 @@ func TestCommandForWrapsAndNeverComposes(t *testing.T) {
 			t.Fatalf("%s: unexpected plan fields %+v", row.tier, command)
 		}
 	}
-	command, _ := CommandFor(rank.MoshMux, "arrakis", nil, refs)
+	command, _ := CommandFor(rank.MoshMux, "arrakis", nil, refs, Flags{})
 	if !reflect.DeepEqual(command.Command, []string{"mosh", "arrakis"}) {
 		t.Fatalf("empty inner: %v", command.Command)
 	}
@@ -41,14 +41,37 @@ func TestCommandForWrapsAndNeverComposes(t *testing.T) {
 func TestSSHQuotesTheInnerWordsAndMoshDoesNot(t *testing.T) {
 	t.Parallel()
 	inner := []string{"sh", "-c", "echo CONNECT_OK on $(hostname)", "it's", "", "a=b"}
-	ssh, _ := CommandFor(rank.SSH, "arrakis", inner, Refs{})
+	ssh, _ := CommandFor(rank.SSH, "arrakis", inner, Refs{}, Flags{})
 	want := []string{"ssh", "-t", "arrakis", "--", "sh", "-c", `'echo CONNECT_OK on $(hostname)'`, `'it'\''s'`, "''", "a=b"}
 	if !reflect.DeepEqual(ssh.Command, want) {
 		t.Fatalf("ssh: %q", ssh.Command)
 	}
-	mosh, _ := CommandFor(rank.MoshMux, "arrakis", inner, Refs{})
+	mosh, _ := CommandFor(rank.MoshMux, "arrakis", inner, Refs{}, Flags{})
 	if !reflect.DeepEqual(mosh.Command, append([]string{"mosh", "arrakis", "--"}, inner...)) {
 		t.Fatalf("mosh: %q", mosh.Command)
+	}
+}
+
+func TestCommandForCarriesTheCallerFlags(t *testing.T) {
+	t.Parallel()
+	flags := Flags{SSH: []string{"-p", "2222", "-i", "key"}, Mosh: []string{"--ssh=ssh -p 2222 -i key"}}
+	ssh, _ := CommandFor(rank.SSH, "u@arrakis", []string{"true"}, Refs{}, flags)
+	if want := []string{"ssh", "-p", "2222", "-i", "key", "-t", "u@arrakis", "--", "true"}; !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("ssh: %q", ssh.Command)
+	}
+	mosh, _ := CommandFor(rank.MoshMux, "u@arrakis", []string{"true"}, Refs{}, flags)
+	if want := []string{"mosh", "--ssh=ssh -p 2222 -i key", "u@arrakis", "--", "true"}; !reflect.DeepEqual(mosh.Command, want) {
+		t.Fatalf("mosh: %q", mosh.Command)
+	}
+	// The caller decided about the tty: no -t is added, theirs is kept.
+	ssh, _ = CommandFor(rank.SSH, "arrakis", []string{"true"}, Refs{}, Flags{SSH: []string{"-T"}, TTY: true})
+	if want := []string{"ssh", "-T", "arrakis", "--", "true"}; !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("ssh -T: %q", ssh.Command)
+	}
+	// A login shell never needs -t.
+	ssh, _ = CommandFor(rank.SSH, "arrakis", nil, Refs{}, Flags{})
+	if want := []string{"ssh", "arrakis"}; !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("login shell: %q", ssh.Command)
 	}
 }
 

@@ -25,6 +25,13 @@ var completionFiles = map[string]string{
 	"zsh":  "completions/_tether",
 }
 
+var tshCompletionFiles = map[string]string{
+	"bash": "completions/tsh.bash",
+	"fish": "completions/tsh.fish",
+	"nu":   "completions/tsh.nu",
+	"zsh":  "completions/_tsh",
+}
+
 func main() {
 	check := flag.Bool("check", false, "fail when a generated artifact differs")
 	flag.Parse()
@@ -38,11 +45,24 @@ func main() {
 		update(path, []byte(rendered), *check)
 	}
 
+	tsh := command.TSHSpecification()
+	for shell, path := range tshCompletionFiles {
+		rendered, err := completion.Generate(shell, tsh)
+		if err != nil {
+			fail(err)
+		}
+		update(path, []byte(rendered), *check)
+	}
+
 	readme, err := os.ReadFile("README.md")
 	if err != nil {
 		fail(err)
 	}
-	rendered, err := completion.ReplaceSection(string(readme), "commands", completion.Markdown(specification))
+	rendered, err := completion.ReplaceSection(string(readme), "tsh", completion.Markdown(tsh))
+	if err != nil {
+		fail(err)
+	}
+	rendered, err = completion.ReplaceSection(rendered, "commands", completion.Markdown(specification))
 	if err != nil {
 		fail(err)
 	}

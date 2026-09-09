@@ -75,7 +75,7 @@ func TestConnectOutsideWeztermExecsTheLocalHop(t *testing.T) {
 	if f.called("ssh -o BatchMode=yes") != 1 {
 		t.Fatalf("probe calls: %v", f.calls)
 	}
-	if !strings.Contains(stderr, "tether: probing arrakis\n") || !strings.Contains(stderr, "tether: mosh-mux -> arrakis (loses native-panes, osc, scrollback)\n") {
+	if !strings.Contains(stderr, "tether connect: probing arrakis\n") || !strings.Contains(stderr, "tether connect: mosh-mux -> arrakis (loses native-panes, osc, scrollback)\n") {
 		t.Fatalf("stderr: %q", stderr)
 	}
 	want := [][]string{{"/bin/mosh", "mosh", "arrakis", "--", "sh", "-c", "echo CONNECT_OK"}}
@@ -88,7 +88,7 @@ func TestConnectOutsideWeztermExecsTheLocalHop(t *testing.T) {
 
 	// A fresh record: no second probe, and --quiet drops the announcement.
 	f.calls, f.execs = nil, nil
-	code, _, stderr = runWith(t, f, f.tools(epoch.Add(time.Minute)), "connect", "arrakis", "--quiet")
+	code, _, stderr = runWith(t, f, f.tools(epoch.Add(time.Minute)), "connect", "-q", "arrakis")
 	if code != 0 || stderr != "" || f.called("ssh -o BatchMode=yes") != 0 {
 		t.Fatalf("exit %d stderr %q calls %v", code, stderr, f.calls)
 	}
@@ -101,7 +101,7 @@ func TestConnectInsideWeztermSpawnsANativeTab(t *testing.T) {
 	isolate(t)
 	f := connectFake()
 	f.env["WEZTERM_PANE"] = "3"
-	code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "arrakis", "--session", "sysinit")
+	code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "-s", "sysinit", "arrakis")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -111,15 +111,15 @@ func TestConnectInsideWeztermSpawnsANativeTab(t *testing.T) {
 	if f.called("wezterm cli list --format json") != 1 || f.called("wezterm cli spawn --domain-name ssh:arrakis --cwd /home/u -- zmx attach sysinit") != 1 {
 		t.Fatalf("wezterm calls: %v", f.calls)
 	}
-	if !strings.Contains(stderr, "tether: native-mux -> arrakis in ssh:arrakis, pane 7 (loses roaming, local-echo)\n") {
+	if !strings.Contains(stderr, "tether connect: native-mux -> arrakis in ssh:arrakis, pane 7 (loses roaming, local-echo)\n") {
 		t.Fatalf("stderr: %q", stderr)
 	}
 
 	// The mux not answering means no native ref: back to a local hop.
 	delete(f.runs, "wezterm cli list --format json")
 	f.calls = nil
-	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "arrakis", "--session", "sysinit")
-	if code != 0 || !strings.Contains(stderr, "tether: mosh-mux -> arrakis") {
+	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "-s", "sysinit", "arrakis")
+	if code != 0 || !strings.Contains(stderr, "tether connect: mosh-mux -> arrakis") {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
 	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/mosh", "mosh", "arrakis", "--", "zmx", "attach", "sysinit"}}) {
@@ -142,26 +142,30 @@ func TestConnectInsideWeztermSpawnsANativeTab(t *testing.T) {
 	}
 }
 
-func TestConnectSessionComesFromTheConfigDefault(t *testing.T) {
+func TestConnectSessionIsOptIn(t *testing.T) {
 	isolate(t)
-	writeSettings(t, `{"defaults":{"session":"main"}}`)
 	f := connectFake()
+	// No -s: a login shell, exactly like ssh arrakis.
 	code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "arrakis")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, stderr)
+	if code != 0 || !reflect.DeepEqual(f.execs, [][]string{{"/bin/mosh", "mosh", "arrakis"}}) {
+		t.Fatalf("exit %d stderr %q execs %v", code, stderr, f.execs)
+	}
+	f.execs = nil
+	if code, _, _ = runWith(t, f, f.tools(epoch), "connect", "-s", "main", "arrakis"); code != 0 {
+		t.Fatalf("exit %d", code)
 	}
 	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/mosh", "mosh", "arrakis", "--", "zmx", "attach", "main"}}) {
 		t.Fatalf("execs: %v", f.execs)
 	}
-	// The flag overrides the default; the remote without a mux gets a note.
+	// The remote without a mux gets a note.
 	f.runs["ssh -o BatchMode=yes"] = "path:mosh-server=/bin/mosh-server\n"
 	f.execs = nil
-	code, _, stderr = runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Second)), "connect", "arrakis", "--session", "other")
+	code, _, stderr = runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Second)), "connect", "--session", "other", "arrakis")
 	if code != 0 || !strings.Contains(stderr, "neither zmx nor tmux on arrakis; opening a login shell instead of session other") {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
 	// mosh-mux needs a remote mux, so ssh carries the login shell.
-	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "-t", "arrakis"}}) {
+	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "arrakis"}}) {
 		t.Fatalf("execs: %v", f.execs)
 	}
 }
@@ -171,7 +175,7 @@ func TestConnectTailnetOnlyHostTargetsTheMagicDNSName(t *testing.T) {
 	writeSettings(t, `{"hosts":{"vault":{"user":"ops"}}}`)
 	f := connectFake()
 	f.env["WEZTERM_PANE"] = "3"
-	code, stdout, stderr := runWith(t, f, f.tools(epoch), "connect", "vault", "--dry-run", "--", "true")
+	code, stdout, stderr := runWith(t, f, f.tools(epoch), "connect", "--dry-run", "vault", "--", "true")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -203,7 +207,7 @@ func TestConnectOfflinePeerExitsWithoutProbing(t *testing.T) {
 	isolate(t)
 	f := connectFake()
 	code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "lv426")
-	if code != 1 || stderr != "tether: lv426 is offline on the tailnet (last seen 2026-09-05T06:42:59Z)\n" {
+	if code != 1 || stderr != "tether connect: lv426 is offline on the tailnet (last seen 2026-09-05T06:42:59Z)\n" {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
 	if f.called("ssh -o BatchMode=yes") != 0 || len(f.execs) != 0 {
@@ -214,14 +218,14 @@ func TestConnectOfflinePeerExitsWithoutProbing(t *testing.T) {
 func TestConnectPinnedButUnavailableExits2(t *testing.T) {
 	isolate(t)
 	f := connectFake()
-	code, stdout, stderr := runWith(t, f, f.tools(epoch), "connect", "arrakis", "--pin", "native-mux")
+	code, stdout, stderr := runWith(t, f, f.tools(epoch), "connect", "--pin", "native-mux", "arrakis")
 	if code != 2 || stdout != "" || len(f.execs) != 0 {
 		t.Fatalf("exit %d stdout %q execs %v", code, stdout, f.execs)
 	}
-	if !strings.Contains(stderr, "tether: pinned tier native-mux unavailable: no native ref (--native)") || !strings.Contains(stderr, "  native-mux filtered:") {
+	if !strings.Contains(stderr, "tether connect: pinned tier native-mux unavailable: no native ref (--native)") || !strings.Contains(stderr, "  native-mux filtered:") {
 		t.Fatalf("stderr: %q", stderr)
 	}
-	code, stdout, _ = runWith(t, f, f.tools(epoch), "connect", "arrakis", "--pin", "native-mux", "--dry-run")
+	code, stdout, _ = runWith(t, f, f.tools(epoch), "connect", "--pin", "native-mux", "--dry-run", "arrakis")
 	if code != 2 || decodePlan(t, stdout).Status != "error" {
 		t.Fatalf("dry run: %d %s", code, stdout)
 	}
@@ -230,19 +234,19 @@ func TestConnectPinnedButUnavailableExits2(t *testing.T) {
 func TestConnectNoProbeAndUnknownHost(t *testing.T) {
 	isolate(t)
 	f := connectFake()
-	code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "arrakis", "--no-probe")
+	code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "--no-probe", "arrakis")
 	if code != 0 || f.called("ssh -o BatchMode=yes") != 0 {
 		t.Fatalf("exit %d calls %v", code, f.calls)
 	}
-	if !strings.Contains(stderr, "tether: ssh -> arrakis") || !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "-t", "arrakis"}}) {
+	if !strings.Contains(stderr, "tether connect: ssh -> arrakis") || !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "arrakis"}}) {
 		t.Fatalf("stderr %q execs %v", stderr, f.execs)
 	}
 	f.execs = nil
-	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "elsewhere.example.com", "--no-probe")
+	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "--no-probe", "elsewhere.example.com")
 	if code != 0 || !strings.Contains(stderr, "elsewhere.example.com is not in the ssh config and not a tailnet peer; trying ssh anyway") {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
-	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "-t", "elsewhere.example.com"}}) {
+	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "elsewhere.example.com"}}) {
 		t.Fatalf("execs %v", f.execs)
 	}
 }
@@ -253,18 +257,18 @@ func TestConnectUsage(t *testing.T) {
 	if code, _, stderr := runWith(t, f, f.tools(epoch), "connect"); code != 2 || !strings.Contains(stderr, "a host is required") {
 		t.Fatalf("no host: %d %q", code, stderr)
 	}
-	if code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "--", "sh"); code != 2 || !strings.Contains(stderr, "a host is required") {
-		t.Fatalf("no host before --: %d %q", code, stderr)
+	if code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "-Z", "arrakis"); code != 2 || !strings.Contains(stderr, "unknown option -Z") {
+		t.Fatalf("unknown option: %d %q", code, stderr)
 	}
-	if code, _, _ := runWith(t, f, f.tools(epoch), "connect", "--help"); code != 0 {
-		t.Fatalf("help: %d", code)
+	if code, _, stderr := runWith(t, f, f.tools(epoch), "connect", "--help"); code != 0 || !strings.Contains(stderr, "tether connect") {
+		t.Fatalf("help: %d %q", code, stderr)
 	}
-	// Flags may follow the host; the inner argv follows --.
-	code, stdout, _ := runWith(t, f, f.tools(epoch), "connect", "arrakis", "--dry-run", "--session", "s", "--", "htop")
+	// ssh's shape: options, then the host, then the command; -- is optional.
+	code, stdout, _ := runWith(t, f, f.tools(epoch), "connect", "--dry-run", "-s", "s", "arrakis", "htop", "-d", "5")
 	if code != 0 {
-		t.Fatalf("flags after host: %d", code)
+		t.Fatalf("command after host: %d", code)
 	}
-	if output := decodePlan(t, stdout); output.Session != "s" || strings.Join(output.Plan.Command, " ") != "mosh arrakis -- htop" {
+	if output := decodePlan(t, stdout); output.Session != "s" || strings.Join(output.Plan.Command, " ") != "mosh arrakis -- htop -d 5" {
 		t.Fatalf("plan: %+v", output)
 	}
 }

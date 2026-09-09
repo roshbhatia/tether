@@ -64,6 +64,16 @@ _tether() {
     case "$context:$word" in
       'connect:--session') consume_value=1; continue ;;
       'connect:--session='*) continue ;;
+      'connect:-s') consume_value=1; continue ;;
+      'connect:-s='*) continue ;;
+      'connect:--login') consume_value=1; continue ;;
+      'connect:--login='*) continue ;;
+      'connect:-l') consume_value=1; continue ;;
+      'connect:-l='*) continue ;;
+      'connect:--port') consume_value=1; continue ;;
+      'connect:--port='*) continue ;;
+      'connect:-p') consume_value=1; continue ;;
+      'connect:-p='*) continue ;;
       'connect:--mode') consume_value=1; continue ;;
       'connect:--mode='*) continue ;;
       'connect:--pin') consume_value=1; continue ;;
@@ -109,12 +119,15 @@ _tether() {
       ;;
     'connect')
       _arguments \
-        '--session[Session to attach with zmx or tmux when no inner argv is given; overrides defaults.session]:value:' \
+        '(-s)--session[Attach this remote mux session (zmx, else tmux) instead of a login shell]:value:' \
+        '(-q)--quiet[Do not announce the winning hop on stderr]' \
+        '(-l)--login[Remote user, as ssh -l]:value:' \
+        '(-p)--port[Remote port, as ssh -p]:value:' \
         '--mode[Ordering mode; overrides the config]:value:__tether_completion_values_1' \
         '--pin[Tier that must win; overrides the config]:value:__tether_completion_values_2' \
-        '--dry-run[Write the plan JSON and exit without connecting]' \
-        '--quiet[Do not announce the winning hop on stderr]' \
+        '--dry-run[Write the tether.plan/v1 document and exit without connecting]' \
         '--no-probe[Never run the ssh round trip; plan from the cache only]' \
+        '--version[Write the version to stdout]' \
         '(-h)--help[Print command help]' \
         '*:argument:__tether_completion_values_0'
 
