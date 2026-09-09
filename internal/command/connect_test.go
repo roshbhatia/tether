@@ -97,7 +97,7 @@ func TestConnectOutsideWeztermExecsTheLocalHop(t *testing.T) {
 	}
 }
 
-func TestConnectInsideWeztermSpawnsANativeTab(t *testing.T) {
+func TestConnectInsideWeztermKeepsForegroundProcess(t *testing.T) {
 	isolate(t)
 	f := connectFake()
 	f.env["WEZTERM_PANE"] = "3"
@@ -105,40 +105,12 @@ func TestConnectInsideWeztermSpawnsANativeTab(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
-	if len(f.execs) != 0 {
-		t.Fatalf("native hop must not exec: %v", f.execs)
-	}
-	if f.called("wezterm cli list --format json") != 1 || f.called("wezterm cli spawn --domain-name ssh:arrakis --cwd /home/u -- zmx attach sysinit") != 1 {
-		t.Fatalf("wezterm calls: %v", f.calls)
-	}
-	if !strings.Contains(stderr, "tether connect: native-mux -> arrakis in ssh:arrakis, pane 7 (loses roaming, local-echo)\n") {
-		t.Fatalf("stderr: %q", stderr)
-	}
-
-	// The mux not answering means no native ref: back to a local hop.
-	delete(f.runs, "wezterm cli list --format json")
-	f.calls = nil
-	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "-s", "sysinit", "arrakis")
-	if code != 0 || !strings.Contains(stderr, "tether connect: mosh-mux -> arrakis") {
-		t.Fatalf("exit %d stderr %q", code, stderr)
-	}
-	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/mosh", "mosh", "arrakis", "--", "zmx", "attach", "sysinit"}}) {
+	want := [][]string{{"/bin/mosh", "mosh", "arrakis", "--", "zmx", "attach", "sysinit"}}
+	if !reflect.DeepEqual(f.execs, want) {
 		t.Fatalf("execs: %v", f.execs)
 	}
-
-	// A login shell passes no command and no cwd: the domain's own default.
-	f.runs["wezterm cli list --format json"] = "[]"
-	f.calls = nil
-	if code, _, _ = runWith(t, f, f.tools(epoch), "connect", "arrakis"); code != 0 || f.called("wezterm cli spawn --domain-name ssh:arrakis") != 1 || f.called("wezterm cli spawn --domain-name ssh:arrakis --cwd") != 0 {
-		t.Fatalf("login shell spawn: %d %v", code, f.calls)
-	}
-
-	// A failed spawn is an error, never a silent fallback.
-	delete(f.runs, "wezterm cli spawn")
-	f.execs = nil
-	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "arrakis")
-	if code != 1 || !strings.Contains(stderr, "wezterm cli spawn --domain-name ssh:arrakis") || len(f.execs) != 0 {
-		t.Fatalf("exit %d stderr %q execs %v", code, stderr, f.execs)
+	if f.called("wezterm cli") != 0 {
+		t.Fatalf("connect touched the GUI: %v", f.calls)
 	}
 }
 

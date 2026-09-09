@@ -143,9 +143,9 @@ func TestTSHCarriesFlagsOnTheWinningTier(t *testing.T) {
 		t.Fatalf("exit %d stderr %q execs %v", code, stderr, f.execs)
 	}
 
-	// Plain: native-mux inside WezTerm, like tether connect.
+	// The terminal environment must not change process ownership.
 	code, _, stderr = runTSH(t, f, "arrakis")
-	if code != 0 || !strings.Contains(stderr, "tsh: native-mux -> arrakis in ssh:arrakis, pane 7") {
+	if code != 0 || !strings.Contains(stderr, "tsh: mosh-mux -> arrakis") {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
 	if code, stdout, _ := runTSH(t, f, "--version"); code != 0 || stdout != "test\n" {

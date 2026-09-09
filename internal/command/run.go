@@ -43,7 +43,7 @@ var specification = completion.Command{
 			Name:              "connect",
 			Description:       "The plumbing behind tsh: negotiate the hop and exec it",
 			Synopsis:          "tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]",
-			LongDescription:   "Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Inside WezTerm an ssh-config host may win native-mux, which opens a tab in the ssh:<host> domain instead.",
+			LongDescription:   "Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. The terminal environment does not change this behavior.",
 			CompletionCommand: []string{"tether", "hosts", "--names"},
 			Flags:             tshSpecification.Flags,
 		},

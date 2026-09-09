@@ -2,8 +2,8 @@
 
 `tsh` is `ssh` with the hop negotiated. Type `tsh arrakis` where you typed
 `ssh arrakis` or `mosh arrakis`: it lands in a login shell over mosh when both
-ends have it, over plain ssh otherwise, and inside WezTerm it may open the
-host's native mux domain instead. One stderr line says which hop won.
+ends have it, over plain ssh otherwise. The command stays in the foreground.
+One stderr line says which hop won.
 
 ```bash
 tsh arrakis                          # login shell, like ssh arrakis
@@ -52,15 +52,7 @@ back.
 
 - A `local` hop (`mosh-mux`, `ssh`) execs the plan command. The process is
   replaced and the exit status is the hop's.
-- A `native` hop (`native-mux`) is a WezTerm tab in the `ssh:<host>` mux
-  domain, opened with `wezterm cli spawn --domain-name`. `tsh` passes
-  `--native ssh:<host>` only when it runs inside WezTerm (`WEZTERM_PANE` is
-  set), `wezterm cli list` answers, and the host is an ssh config alias, since
-  the GUI builds those domains from the ssh config. Native is a display
-  concept: from a plain terminal, `tsh` is always a local hop. The remote
-  `wezterm-mux-server` spawns the inner argv itself, with its own PATH and in
-  the remote home the probe recorded (`wezterm cli spawn` would otherwise hand
-  it this pane's cwd, which does not exist over there).
+- `connect` never launches a terminal tab. A GUI can consume `tether plan --native <domain>` and launch the returned plan.
 - With no command the far side gets its login shell, exactly like `ssh`. With
   `-s S` it gets `zmx attach S` when the probe saw `zmx` on the remote, else
   `tmux new -A -s S` when it saw `tmux`, else the login shell and a stderr
@@ -221,7 +213,7 @@ The plumbing behind tsh. Resolve which transport carries a command to a host, fr
 
 tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]
 
-Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Inside WezTerm an ssh-config host may win native-mux, which opens a tab in the ssh:<host> domain instead.
+Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. The terminal environment does not change this behavior.
 
 | Option | Description |
 | --- | --- |

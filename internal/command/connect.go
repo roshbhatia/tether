@@ -9,7 +9,6 @@ import (
 
 	"github.com/roshbhatia/go-utils/completion"
 	"github.com/roshbhatia/tether/internal/config"
-	"github.com/roshbhatia/tether/internal/hosts"
 	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
 )
@@ -94,9 +93,6 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		MoshUnfit:   flags.moshUnfit,
 		NativeUnfit: flags.nativeUnfit,
 	}
-	if ref, ok := nativeRef(ctx, streams, tools, target); ok {
-		req.Native = ref
-	}
 	output, err := rankHost(ctx, streams, settings, target, req)
 	if err != nil && !isRankError(err) {
 		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
@@ -118,7 +114,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		}
 		return 2
 	}
-	return realize(ctx, prog, streams, tools, output, record.Remote.Home, options.quiet)
+	return realize(prog, streams, tools, output, options.quiet)
 }
 
 func lastSeen(peer probe.Peer) string {
@@ -151,32 +147,7 @@ func defaultInner(inner []string, session, host string, remote probe.Remote, kno
 	}
 }
 
-// nativeRef names the caller's WezTerm ssh domain, only when this process runs
-// inside WezTerm, the mux answers, and the host is an ssh config alias (the
-// domains are built from those). From a plain terminal there is no native hop.
-func nativeRef(ctx context.Context, streams Streams, tools probe.Tools, target hosts.Host) (string, bool) {
-	if streams.getenv("WEZTERM_PANE") == "" {
-		return "", false
-	}
-	if target.Source != hosts.SourceSSHConfig && target.Source != hosts.SourceBoth {
-		return "", false
-	}
-	wezterm, err := tools.LookPath("wezterm")
-	if err != nil || tools.Run == nil {
-		return "", false
-	}
-	if _, _, err := tools.Run(ctx, wezterm, "cli", "list", "--format", "json"); err != nil {
-		return "", false
-	}
-	return "ssh:" + target.Name, true
-}
-
-// realize runs the chosen hop: a local hop replaces this process; a native
-// hop opens a tab in the WezTerm domain the ref names. The remote mux server
-// spawns a native command itself, and `wezterm cli spawn` would hand it this
-// pane's cwd, which does not exist over there, so the remote home (or /) is
-// passed instead.
-func realize(ctx context.Context, prog string, streams Streams, tools probe.Tools, output plan.Output, remoteHome string, quiet bool) int {
+func realize(prog string, streams Streams, tools probe.Tools, output plan.Output, quiet bool) int {
 	if output.Plan == nil || output.Hop == nil {
 		fmt.Fprintf(streams.Stderr, "%s: plan has no command\n", prog)
 		return 1
@@ -186,34 +157,6 @@ func realize(ctx context.Context, prog string, streams Streams, tools probe.Tool
 		loses = " (loses " + strings.Join(output.Loses, ", ") + ")"
 	}
 	switch output.Hop.Kind {
-	case "native":
-		wezterm, err := tools.LookPath("wezterm")
-		if err != nil || tools.Run == nil {
-			fmt.Fprintf(streams.Stderr, "%s: native hop chosen but wezterm is absent\n", prog)
-			return 1
-		}
-		args := []string{"cli", "spawn", "--domain-name", output.Hop.Ref}
-		if len(output.Plan.Command) > 0 {
-			cwd := remoteHome
-			if cwd == "" {
-				cwd = "/"
-			}
-			args = append(args, "--cwd", cwd, "--")
-			args = append(args, output.Plan.Command...)
-		}
-		out, errOut, err := tools.Run(ctx, wezterm, args...)
-		if err != nil {
-			message := strings.TrimSpace(string(errOut))
-			if message == "" {
-				message = err.Error()
-			}
-			fmt.Fprintf(streams.Stderr, "%s: wezterm cli spawn --domain-name %s: %s\n", prog, output.Hop.Ref, message)
-			return 1
-		}
-		if !quiet {
-			fmt.Fprintf(streams.Stderr, "%s: %s -> %s in %s, pane %s%s\n", prog, output.Chosen.Tier, output.Host, output.Hop.Ref, strings.TrimSpace(string(out)), loses)
-		}
-		return 0
 	case "local":
 		if len(output.Plan.Command) == 0 {
 			fmt.Fprintf(streams.Stderr, "%s: plan has no command\n", prog)
