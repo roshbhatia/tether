@@ -1,0 +1,26 @@
+{
+  "version": "provider/v1",
+  "kind": "picker",
+  "name": "tether",
+  "description": "Hosts",
+  "command": [
+    "tether-picker"
+  ],
+  "actions": {
+    "provider.validate": {
+      "description": "provider.validate"
+    },
+    "picker.describe": {
+      "description": "picker.describe"
+    },
+    "picker.list": {
+      "description": "picker.list"
+    },
+    "picker.open": {
+      "description": "picker.open"
+    }
+  },
+  "defaults": {
+    "timeout": "5s"
+  }
+}

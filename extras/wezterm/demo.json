@@ -1,0 +1,14 @@
+{
+  "name": "wezterm",
+  "summary": "Select a development host for the repair task",
+  "replay": false,
+  "core": "tether",
+  "nix": "github:roshbhatia/tether#provider-wezterm",
+  "brew": "tether-provider-wezterm",
+  "binary": "tether-picker",
+  "dependencies": [
+    "python@3.13",
+    "roshbhatia/tap/tether"
+  ],
+  "manifest_path": "share/wezterm/providers/tether.json"
+}

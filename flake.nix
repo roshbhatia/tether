@@ -40,7 +40,7 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          version = "0.2.0";
+          version = "0.3.0";
           # Refresh with `nix build` after any go.mod or go.sum change; the
           # build prints the hash it expected.
           vendorHash = "sha256-ZLnyCDvIhS5mu8FCCTqQakqJ/5Smu3A/5058kh2jELE=";
@@ -98,6 +98,19 @@
         in
         {
           inherit tether;
+          provider-wezterm = import ./extras/wezterm {
+            inherit pkgs;
+            core = tether;
+          };
+          extras = self.packages.${system}.provider-wezterm;
+          full = pkgs.symlinkJoin {
+            name = "tether-full";
+            paths = [
+              tether
+              self.packages.${system}.extras
+            ];
+            meta = tether.meta;
+          };
           default = tether;
         }
       );
@@ -142,6 +155,10 @@
         {
           default = pkgs.mkShellNoCC {
             packages = [
+              pkgs.python3
+              pkgs.vhs
+              pkgs.ffmpeg
+              pkgs.git
               pkgs.go
               pkgs.actionlint
               pkgs.bash

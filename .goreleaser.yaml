@@ -3,6 +3,7 @@ project_name: tether
 
 before:
   hooks:
+    - python3 hack/release-scripts.py --version {{ .Version }} --all --output .release-extras
     - ./hack/generate.sh --check
 
 builds:
@@ -20,10 +21,24 @@ builds:
         goarch: amd64
     ldflags:
       - -s -w -X main.version={{.Version}}
+  - id: tsh
+    main: ./cmd/tsh
+    binary: tsh
+    env:
+      - CGO_ENABLED=0
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: darwin
+        goarch: amd64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
 
 archives:
   - id: tether
-    ids: [tether]
+    ids: [tether, tsh]
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
@@ -40,3 +55,7 @@ checksum:
 
 changelog:
   use: github-native
+
+release:
+  extra_files:
+    - glob: .release-extras/*

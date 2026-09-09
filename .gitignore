@@ -1,3 +1,5 @@
 /result
 /dist
 /coverage.out
+
+.release-extras/
