@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Host": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "ssh-config",
+            "tailnet",
+            "both"
+          ]
+        },
+        "hostname": {
+          "type": "string",
+          "description": "HostName from ssh -G"
+        },
+        "user": {
+          "type": "string",
+          "description": "User from ssh -G or the config"
+        },
+        "target": {
+          "type": "string",
+          "description": "The ssh argument: the alias"
+        },
+        "peer": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Peer",
+              "description": "The tailnet peer; null when the host is only in the ssh config"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "source",
+        "hostname",
+        "target",
+        "peer"
+      ]
+    },
+    "Peer": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "MagicDNS label; unique on the tailnet"
+        },
+        "hostname": {
+          "type": "string",
+          "description": "The node's own hostname; not unique"
+        },
+        "dns_name": {
+          "type": "string",
+          "description": "Fully qualified MagicDNS name without the trailing dot"
+        },
+        "ips": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "os": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "relay": {
+          "type": "string"
+        },
+        "direct": {
+          "type": "boolean",
+          "description": "A direct path was active at status time"
+        },
+        "tailscale_ssh": {
+          "type": "boolean",
+          "description": "The peer advertises SSH host keys"
+        },
+        "last_seen": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "description": "Set for an offline peer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "hostname",
+        "dns_name",
+        "ips",
+        "os",
+        "tags",
+        "online",
+        "direct",
+        "tailscale_ssh",
+        "last_seen"
+      ]
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "ssh_config": {
+      "type": "string"
+    },
+    "tailnet": {
+      "type": "boolean",
+      "description": "tailscale status answered"
+    },
+    "hosts": {
+      "items": {
+        "$ref": "#/$defs/Host"
+      },
+      "type": "array"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "ssh_config",
+    "tailnet",
+    "hosts"
+  ],
+  "title": "tether.hosts/v1"
+}

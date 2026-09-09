@@ -13,6 +13,7 @@ import (
 	goconfig "github.com/roshbhatia/go-utils/config"
 	"github.com/roshbhatia/tether/internal/command"
 	"github.com/roshbhatia/tether/internal/config"
+	"github.com/roshbhatia/tether/internal/hosts"
 	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
 )
@@ -22,6 +23,13 @@ var completionFiles = map[string]string{
 	"fish": "completions/tether.fish",
 	"nu":   "completions/tether.nu",
 	"zsh":  "completions/_tether",
+}
+
+var tshCompletionFiles = map[string]string{
+	"bash": "completions/tsh.bash",
+	"fish": "completions/tsh.fish",
+	"nu":   "completions/tsh.nu",
+	"zsh":  "completions/_tsh",
 }
 
 func main() {
@@ -37,20 +45,34 @@ func main() {
 		update(path, []byte(rendered), *check)
 	}
 
+	tsh := command.TSHSpecification()
+	for shell, path := range tshCompletionFiles {
+		rendered, err := completion.Generate(shell, tsh)
+		if err != nil {
+			fail(err)
+		}
+		update(path, []byte(rendered), *check)
+	}
+
 	readme, err := os.ReadFile("README.md")
 	if err != nil {
 		fail(err)
 	}
-	rendered, err := completion.ReplaceSection(string(readme), "commands", completion.Markdown(specification))
+	rendered, err := completion.ReplaceSection(string(readme), "tsh", completion.Markdown(tsh))
+	if err != nil {
+		fail(err)
+	}
+	rendered, err = completion.ReplaceSection(rendered, "commands", completion.Markdown(specification))
 	if err != nil {
 		fail(err)
 	}
 	update("README.md", []byte(rendered), *check)
 
 	for path, render := range map[string]func() ([]byte, error){
-		"schema/tether.plan.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[plan.Output](plan.Version) },
-		"schema/tether.host.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[probe.Host](probe.HostVersion) },
-		"schema/config.schema.json":         config.Schema,
+		"schema/tether.plan.v1.schema.json":  func() ([]byte, error) { return goconfig.Schema[plan.Output](plan.Version) },
+		"schema/tether.host.v1.schema.json":  func() ([]byte, error) { return goconfig.Schema[probe.Host](probe.HostVersion) },
+		"schema/tether.hosts.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[hosts.Output](hosts.Version) },
+		"schema/config.schema.json":          config.Schema,
 	} {
 		schema, err := render()
 		if err != nil {

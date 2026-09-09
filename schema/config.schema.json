@@ -40,6 +40,10 @@
             "persist"
           ],
           "description": "Mode for this host; overrides the top-level mode"
+        },
+        "user": {
+          "type": "string",
+          "description": "Remote user; prepended as user@ to the ssh target"
         }
       },
       "additionalProperties": false,

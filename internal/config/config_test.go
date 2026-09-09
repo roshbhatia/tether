@@ -77,3 +77,22 @@ func TestEnvironmentOverridesFlakyThreshold(t *testing.T) {
 		t.Fatalf("rtt_ms = %v, want 120", loaded.Flaky.RTTMs)
 	}
 }
+
+func TestLoadReadsHostUser(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"hosts":{"vault":{"user":"ops"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TETHER_CONFIG", path)
+	loaded, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.UserFor("vault") != "ops" || loaded.UserFor("other") != "" {
+		t.Fatalf("loaded: %+v", loaded)
+	}
+	if loaded.Mode != ModeAuto || loaded.Flaky.RTTMs != 60 {
+		t.Fatalf("defaults lost: %+v", loaded)
+	}
+}

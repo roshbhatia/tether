@@ -40,15 +40,18 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          version = "0.1.0";
+          version = "0.2.0";
           # Refresh with `nix build` after any go.mod or go.sum change; the
           # build prints the hash it expected.
-          vendorHash = "sha256-l6WwYNR/LKhGC5KOipTqvtmu6tb66TznqnGoNImrBw4=";
+          vendorHash = "sha256-ZLnyCDvIhS5mu8FCCTqQakqJ/5Smu3A/5058kh2jELE=";
           tether = pkgs.buildGoModule {
             pname = "tether";
             inherit version vendorHash;
             src = ./.;
-            subPackages = [ "cmd/tether" ];
+            subPackages = [
+              "cmd/tether"
+              "cmd/tsh"
+            ];
             nativeBuildInputs = [ pkgs.installShellFiles ];
             nativeCheckInputs = [
               pkgs.bash
@@ -63,25 +66,29 @@
               go vet ./...
               go test -race ./...
               ${pkgs.bash}/bin/bash ./hack/generate.sh --check
-              bash -n completions/tether.bash
-              fish --no-config -n completions/tether.fish
-              nu --no-config-file --no-std-lib -c 'source completions/tether.nu'
-              zsh -n completions/_tether
+              for name in tether tsh; do
+                bash -n "completions/$name.bash"
+                fish --no-config -n "completions/$name.fish"
+                nu --no-config-file --no-std-lib -c "source completions/$name.nu"
+                zsh -n "completions/_$name"
+              done
               runHook postCheck
             '';
             ldflags = [ "-s -w -X main.version=${version}" ];
             postInstall = ''
-              installShellCompletion --cmd tether \
-                --bash completions/tether.bash \
-                --fish completions/tether.fish \
-                --zsh completions/_tether
-              mkdir -p "$out/share/nushell/vendor/autoload"
-              install -m 0444 completions/tether.nu "$out/share/nushell/vendor/autoload/tether.nu"
+              for name in tether tsh; do
+                installShellCompletion --cmd "$name" \
+                  --bash "completions/$name.bash" \
+                  --fish "completions/$name.fish" \
+                  --zsh "completions/_$name"
+                mkdir -p "$out/share/nushell/vendor/autoload"
+                install -m 0444 "completions/$name.nu" "$out/share/nushell/vendor/autoload/$name.nu"
+              done
               mkdir -p "$out/share/tether/schema"
               cp schema/*.json "$out/share/tether/schema/"
             '';
             meta = {
-              description = "Transport negotiator: picks the hop (native mux, mosh, ssh) for a remote session";
+              description = "tsh: ssh with the hop (native mux, mosh, ssh) negotiated; tether is its plumbing";
               homepage = "https://github.com/roshbhatia/tether";
               license = pkgs.lib.licenses.mit;
               mainProgram = "tether";

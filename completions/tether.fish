@@ -2,12 +2,42 @@ complete -c tether -e
 complete -c tether -f
 function __tether_completion_values_0
   begin
-    printf '%s\n' 'auto' 'native' 'roam' 'persist'
+    command 'tether' 'hosts' '--names' 2>/dev/null; or true
   end | string match -rv '\t'; or true
 end
 function __tether_completion_values_1
   begin
+    printf '%s\n' 'auto' 'native' 'roam' 'persist'
+  end | string match -rv '\t'; or true
+end
+function __tether_completion_values_2
+  begin
     printf '%s\n' 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh'
+  end | string match -rv '\t'; or true
+end
+function __tether_completion_values_3
+  begin
+    command 'tether' 'hosts' '--names' 2>/dev/null; or true
+  end | string match -rv '\t'; or true
+end
+function __tether_completion_values_4
+  begin
+    printf '%s\n' 'auto' 'native' 'roam' 'persist'
+  end | string match -rv '\t'; or true
+end
+function __tether_completion_values_5
+  begin
+    printf '%s\n' 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh'
+  end | string match -rv '\t'; or true
+end
+function __tether_completion_values_6
+  begin
+    command 'tether' 'hosts' '--names' 2>/dev/null; or true
+  end | string match -rv '\t'; or true
+end
+function __tether_completion_values_7
+  begin
+    command 'tether' 'hosts' '--names' 2>/dev/null; or true
   end | string match -rv '\t'; or true
 end
 
@@ -29,6 +59,37 @@ function __tether_completion_context
       continue
     end
     switch "$context:$word"
+      case 'connect:--session' 'connect:-s'
+        set consume_value 1
+        continue
+      case 'connect:--session=*'
+        continue
+      case 'connect:-s=*'
+        continue
+      case 'connect:--login' 'connect:-l'
+        set consume_value 1
+        continue
+      case 'connect:--login=*'
+        continue
+      case 'connect:-l=*'
+        continue
+      case 'connect:--port' 'connect:-p'
+        set consume_value 1
+        continue
+      case 'connect:--port=*'
+        continue
+      case 'connect:-p=*'
+        continue
+      case 'connect:--mode'
+        set consume_value 1
+        continue
+      case 'connect:--mode=*'
+        continue
+      case 'connect:--pin'
+        set consume_value 1
+        continue
+      case 'connect:--pin=*'
+        continue
       case 'plan:--host'
         set consume_value 1
         continue
@@ -73,10 +134,14 @@ function __tether_completion_context
     switch "$context:$word"
       case ':completion'
         set context 'completion'
+      case ':connect'
+        set context 'connect'
       case ':plan'
         set context 'plan'
       case ':probe'
         set context 'probe'
+      case ':hosts'
+        set context 'hosts'
       case ':status'
         set context 'status'
       case ':completion'
@@ -88,21 +153,37 @@ end
 complete -c tether -n 'test (__tether_completion_context) = ""' -l help -s h -d 'Print command help'
 complete -c tether -n 'test (__tether_completion_context) = ""' -l version -d 'Write the version to stdout'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a completion -d 'Generate shell completions'
+complete -c tether -f -n 'test (__tether_completion_context) = ""' -a connect -d 'tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a plan -d 'tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a probe -d 'tether probe --host <host> [--force]'
+complete -c tether -f -n 'test (__tether_completion_context) = ""' -a hosts -d 'tether hosts [--json] [--names]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a status -d 'tether status [--host <host>]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a completion -d 'tether completion <bash|fish|nu|zsh>'
 complete -c tether -f -n 'test (__tether_completion_context) = "completion"' -a 'bash zsh fish nu'
-complete -c tether -n 'test (__tether_completion_context) = "plan"' -l host -r -d 'ssh host alias'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l session -s s -r -d 'Attach this remote mux session (zmx, else tmux) instead of a login shell'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l quiet -s q -d 'Do not announce the winning hop on stderr'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l login -s l -r -d 'Remote user, as ssh -l'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l port -s p -r -d 'Remote port, as ssh -p'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -f -l mode -r -a '(__tether_completion_values_1)' -d 'Ordering mode; overrides the config'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -f -l pin -r -a '(__tether_completion_values_2)' -d 'Tier that must win; overrides the config'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l dry-run -d 'Write the tether.plan/v1 document and exit without connecting'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l no-probe -d 'Never run the ssh round trip; plan from the cache only'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l version -d 'Write the version to stdout'
+complete -c tether -n 'test (__tether_completion_context) = "connect"' -l help -s h -d 'Print command help'
+complete -c tether -f -n 'test (__tether_completion_context) = "connect"' -a '(__tether_completion_values_0)'
+complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l host -r -a '(__tether_completion_values_3)' -d 'ssh config alias or tailnet peer'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l session -r -d 'Session name echoed in the output'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l native -r -d 'Opaque ref of the caller\'s native mux domain'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l native-raw -r -d 'Opaque ref of the caller\'s raw ssh domain'
-complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l mode -r -a '(__tether_completion_values_0)' -d 'Ordering mode; overrides the config'
-complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l pin -r -a '(__tether_completion_values_1)' -d 'Tier that must win; overrides the config'
+complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l mode -r -a '(__tether_completion_values_4)' -d 'Ordering mode; overrides the config'
+complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l pin -r -a '(__tether_completion_values_5)' -d 'Tier that must win; overrides the config'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l help -s h -d 'Print command help'
-complete -c tether -n 'test (__tether_completion_context) = "probe"' -l host -r -d 'ssh host alias'
+complete -c tether -n 'test (__tether_completion_context) = "probe"' -f -l host -r -a '(__tether_completion_values_6)' -d 'ssh config alias or tailnet peer'
 complete -c tether -n 'test (__tether_completion_context) = "probe"' -l force -d 'Probe even inside the unreachable-host backoff'
 complete -c tether -n 'test (__tether_completion_context) = "probe"' -l help -s h -d 'Print command help'
-complete -c tether -n 'test (__tether_completion_context) = "status"' -l host -r -d 'Only this host'
+complete -c tether -n 'test (__tether_completion_context) = "hosts"' -l json -d 'Write tether.hosts/v1 instead of a table'
+complete -c tether -n 'test (__tether_completion_context) = "hosts"' -l names -d 'Write one name per line, for completion'
+complete -c tether -n 'test (__tether_completion_context) = "hosts"' -l help -s h -d 'Print command help'
+complete -c tether -n 'test (__tether_completion_context) = "status"' -f -l host -r -a '(__tether_completion_values_7)' -d 'Only this host'
 complete -c tether -n 'test (__tether_completion_context) = "status"' -l help -s h -d 'Print command help'
 complete -c tether -f -n 'test (__tether_completion_context) = "completion"' -a 'bash zsh fish nu'

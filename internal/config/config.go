@@ -44,6 +44,7 @@ type Flaky struct {
 type Host struct {
 	Pin  string `json:"pin,omitempty" yaml:"pin" jsonschema:"enum=native-mux,enum=mosh-mux,enum=ssh-raw,enum=ssh,description=Tier that always wins; an unavailable pin is an error"`
 	Mode Mode   `json:"mode,omitempty" yaml:"mode" jsonschema:"enum=auto,enum=native,enum=roam,enum=persist,description=Mode for this host; overrides the top-level mode"`
+	User string `json:"user,omitempty" yaml:"user" jsonschema:"description=Remote user; prepended as user@ to the ssh target"`
 }
 
 // Config is the whole configuration file.
@@ -100,6 +101,11 @@ func (config Config) ModeFor(host string) Mode {
 // PinFor returns the host's pinned tier, or "".
 func (config Config) PinFor(host string) string {
 	return config.Hosts[host].Pin
+}
+
+// UserFor returns the host's configured remote user, or "".
+func (config Config) UserFor(host string) string {
+	return config.Hosts[host].User
 }
 
 // Schema returns the JSON Schema for the configuration file.

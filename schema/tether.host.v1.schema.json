@@ -96,6 +96,14 @@
         "direct": {
           "type": "boolean",
           "description": "A direct path was active at status time"
+        },
+        "dns_name": {
+          "type": "string",
+          "description": "MagicDNS name of the matched peer"
+        },
+        "ssh": {
+          "type": "boolean",
+          "description": "The peer advertises SSH host keys"
         }
       },
       "additionalProperties": false,
@@ -104,7 +112,8 @@
         "present",
         "peer",
         "online",
-        "direct"
+        "direct",
+        "ssh"
       ]
     },
     "Remote": {
@@ -127,6 +136,10 @@
         },
         "wezterm_mux_server": {
           "type": "string"
+        },
+        "home": {
+          "type": "string",
+          "description": "The remote $HOME; a native hop starts there"
         },
         "versions": {
           "additionalProperties": {
@@ -159,6 +172,10 @@
     },
     "host": {
       "type": "string"
+    },
+    "target": {
+      "type": "string",
+      "description": "What ssh was given when it differs from host"
     },
     "at": {
       "type": "string",

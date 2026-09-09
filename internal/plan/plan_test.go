@@ -24,7 +24,7 @@ func TestCommandForWrapsAndNeverComposes(t *testing.T) {
 		{rank.SSH, []string{"ssh", "-t", "arrakis", "--", "zmx", "attach", "sysinit"}, Hop{Kind: "local"}},
 	}
 	for _, row := range rows {
-		command, hop := CommandFor(row.tier, "arrakis", inner, refs)
+		command, hop := CommandFor(row.tier, "arrakis", inner, refs, Flags{})
 		if !reflect.DeepEqual(command.Command, row.command) || hop != row.hop {
 			t.Fatalf("%s: command %v hop %+v", row.tier, command.Command, hop)
 		}
@@ -32,9 +32,46 @@ func TestCommandForWrapsAndNeverComposes(t *testing.T) {
 			t.Fatalf("%s: unexpected plan fields %+v", row.tier, command)
 		}
 	}
-	command, _ := CommandFor(rank.MoshMux, "arrakis", nil, refs)
+	command, _ := CommandFor(rank.MoshMux, "arrakis", nil, refs, Flags{})
 	if !reflect.DeepEqual(command.Command, []string{"mosh", "arrakis"}) {
 		t.Fatalf("empty inner: %v", command.Command)
+	}
+}
+
+func TestSSHQuotesTheInnerWordsAndMoshDoesNot(t *testing.T) {
+	t.Parallel()
+	inner := []string{"sh", "-c", "echo CONNECT_OK on $(hostname)", "it's", "", "a=b"}
+	ssh, _ := CommandFor(rank.SSH, "arrakis", inner, Refs{}, Flags{})
+	want := []string{"ssh", "-t", "arrakis", "--", "sh", "-c", `'echo CONNECT_OK on $(hostname)'`, `'it'\''s'`, "''", "a=b"}
+	if !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("ssh: %q", ssh.Command)
+	}
+	mosh, _ := CommandFor(rank.MoshMux, "arrakis", inner, Refs{}, Flags{})
+	if !reflect.DeepEqual(mosh.Command, append([]string{"mosh", "arrakis", "--"}, inner...)) {
+		t.Fatalf("mosh: %q", mosh.Command)
+	}
+}
+
+func TestCommandForCarriesTheCallerFlags(t *testing.T) {
+	t.Parallel()
+	flags := Flags{SSH: []string{"-p", "2222", "-i", "key"}, Mosh: []string{"--ssh=ssh -p 2222 -i key"}}
+	ssh, _ := CommandFor(rank.SSH, "u@arrakis", []string{"true"}, Refs{}, flags)
+	if want := []string{"ssh", "-p", "2222", "-i", "key", "-t", "u@arrakis", "--", "true"}; !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("ssh: %q", ssh.Command)
+	}
+	mosh, _ := CommandFor(rank.MoshMux, "u@arrakis", []string{"true"}, Refs{}, flags)
+	if want := []string{"mosh", "--ssh=ssh -p 2222 -i key", "u@arrakis", "--", "true"}; !reflect.DeepEqual(mosh.Command, want) {
+		t.Fatalf("mosh: %q", mosh.Command)
+	}
+	// The caller decided about the tty: no -t is added, theirs is kept.
+	ssh, _ = CommandFor(rank.SSH, "arrakis", []string{"true"}, Refs{}, Flags{SSH: []string{"-T"}, TTY: true})
+	if want := []string{"ssh", "-T", "arrakis", "--", "true"}; !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("ssh -T: %q", ssh.Command)
+	}
+	// A login shell never needs -t.
+	ssh, _ = CommandFor(rank.SSH, "arrakis", nil, Refs{}, Flags{})
+	if want := []string{"ssh", "arrakis"}; !reflect.DeepEqual(ssh.Command, want) {
+		t.Fatalf("login shell: %q", ssh.Command)
 	}
 }
 
@@ -46,7 +83,7 @@ func TestBuildAndFailure(t *testing.T) {
 		Filtered: []rank.Filtered{{Tier: rank.Tiers[0], Reason: "no native ref (--native)"}},
 		Reasons:  []string{"mode roam"},
 	}
-	output := Build("arrakis", "sysinit", []string{"zmx", "attach", "sysinit"}, Refs{}, result, Probe{Stale: true})
+	output := Build(Subject{Host: "arrakis", Target: "u@arrakis.stork-eel.ts.net", Session: "sysinit"}, []string{"zmx", "attach", "sysinit"}, Refs{}, result, Probe{Stale: true})
 	if output.Version != Version || output.Status != "ok" || output.Chosen.Tier != rank.MoshMux || output.Chosen.Rank != 2 {
 		t.Fatalf("unexpected output: %+v", output)
 	}
@@ -59,8 +96,11 @@ func TestBuildAndFailure(t *testing.T) {
 	if !output.Probe.Stale {
 		t.Fatal("probe staleness dropped")
 	}
+	if output.Host != "arrakis" || output.Target != "u@arrakis.stork-eel.ts.net" || output.Plan.Command[1] != "u@arrakis.stork-eel.ts.net" {
+		t.Fatalf("target not carried into the command: %+v", output)
+	}
 
-	failure := Failure("arrakis", "", errors.New("pinned tier mosh-mux unavailable: local mosh absent"), result, Probe{})
+	failure := Failure(Subject{Host: "arrakis"}, errors.New("pinned tier mosh-mux unavailable: local mosh absent"), result, Probe{})
 	if failure.Status != "error" || failure.Chosen != nil || failure.Plan != nil || failure.Error == "" {
 		t.Fatalf("unexpected failure: %+v", failure)
 	}
