@@ -1,8 +1,26 @@
 __tether_completion_values_0() {
-  printf '%s\n' 'auto' 'native' 'roam' 'persist'
+  'tether' 'hosts' '--names' 2>/dev/null || true
 }
 __tether_completion_values_1() {
+  printf '%s\n' 'auto' 'native' 'roam' 'persist'
+}
+__tether_completion_values_2() {
   printf '%s\n' 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh'
+}
+__tether_completion_values_3() {
+  'tether' 'hosts' '--names' 2>/dev/null || true
+}
+__tether_completion_values_4() {
+  printf '%s\n' 'auto' 'native' 'roam' 'persist'
+}
+__tether_completion_values_5() {
+  printf '%s\n' 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh'
+}
+__tether_completion_values_6() {
+  'tether' 'hosts' '--names' 2>/dev/null || true
+}
+__tether_completion_values_7() {
+  'tether' 'hosts' '--names' 2>/dev/null || true
 }
 __tether_completion_filter() {
   local prefix="$1"
@@ -50,6 +68,12 @@ _tether_complete() {
       continue
     fi
     case "$context:$word" in
+      'connect:--session') consume_value=1; continue ;;
+      'connect:--session='*) continue ;;
+      'connect:--mode') consume_value=1; continue ;;
+      'connect:--mode='*) continue ;;
+      'connect:--pin') consume_value=1; continue ;;
+      'connect:--pin='*) continue ;;
       'plan:--host') consume_value=1; continue ;;
       'plan:--host='*) continue ;;
       'plan:--session') consume_value=1; continue ;;
@@ -69,29 +93,47 @@ _tether_complete() {
     esac
     case "$context:$word" in
       ':completion') context='completion' ;;
+      ':connect') context='connect' ;;
       ':plan') context='plan' ;;
       ':probe') context='probe' ;;
+      ':hosts') context='hosts' ;;
       ':status') context='status' ;;
       ':completion') context='completion' ;;
     esac
   done
   case "$context:$previous" in
-    'plan:--mode') __tether_completion_filter "$current" < <(__tether_completion_values_0); return ;;
-    'plan:--pin') __tether_completion_filter "$current" < <(__tether_completion_values_1); return ;;
+    'connect:--mode') __tether_completion_filter "$current" < <(__tether_completion_values_1); return ;;
+    'connect:--pin') __tether_completion_filter "$current" < <(__tether_completion_values_2); return ;;
+    'plan:--host') __tether_completion_filter "$current" < <(__tether_completion_values_3); return ;;
+    'plan:--mode') __tether_completion_filter "$current" < <(__tether_completion_values_4); return ;;
+    'plan:--pin') __tether_completion_filter "$current" < <(__tether_completion_values_5); return ;;
+    'probe:--host') __tether_completion_filter "$current" < <(__tether_completion_values_6); return ;;
+    'status:--host') __tether_completion_filter "$current" < <(__tether_completion_values_7); return ;;
   esac
   case "$context:$current" in
-    'plan:--mode='*) __tether_completion_filter "${current#*=}" "--mode=" < <(__tether_completion_values_0); return ;;
-    'plan:--pin='*) __tether_completion_filter "${current#*=}" "--pin=" < <(__tether_completion_values_1); return ;;
+    'connect:--mode='*) __tether_completion_filter "${current#*=}" "--mode=" < <(__tether_completion_values_1); return ;;
+    'connect:--pin='*) __tether_completion_filter "${current#*=}" "--pin=" < <(__tether_completion_values_2); return ;;
+    'plan:--host='*) __tether_completion_filter "${current#*=}" "--host=" < <(__tether_completion_values_3); return ;;
+    'plan:--mode='*) __tether_completion_filter "${current#*=}" "--mode=" < <(__tether_completion_values_4); return ;;
+    'plan:--pin='*) __tether_completion_filter "${current#*=}" "--pin=" < <(__tether_completion_values_5); return ;;
+    'probe:--host='*) __tether_completion_filter "${current#*=}" "--host=" < <(__tether_completion_values_6); return ;;
+    'status:--host='*) __tether_completion_filter "${current#*=}" "--host=" < <(__tether_completion_values_7); return ;;
   esac
   case "$context" in
     '')
       __tether_completion_filter "$current" < <(
-        printf '%s\n' 'completion' 'plan' 'probe' 'status' 'completion' '--help' '-h' '--version'
+        printf '%s\n' 'completion' 'connect' 'plan' 'probe' 'hosts' 'status' 'completion' '--help' '-h' '--version'
       )
       ;;
     'completion')
       __tether_completion_filter "$current" < <(
         printf '%s\n' 'bash' 'zsh' 'fish' 'nu'
+      )
+      ;;
+    'connect')
+      __tether_completion_filter "$current" < <(
+        printf '%s\n' '--session' '--mode' '--pin' '--dry-run' '--quiet' '--no-probe' '--help' '-h'
+        __tether_completion_values_0
       )
       ;;
     'plan')
@@ -102,6 +144,11 @@ _tether_complete() {
     'probe')
       __tether_completion_filter "$current" < <(
         printf '%s\n' '--host' '--force' '--help' '-h'
+      )
+      ;;
+    'hosts')
+      __tether_completion_filter "$current" < <(
+        printf '%s\n' '--json' '--names' '--help' '-h'
       )
       ;;
     'status')

@@ -13,6 +13,7 @@ import (
 	goconfig "github.com/roshbhatia/go-utils/config"
 	"github.com/roshbhatia/tether/internal/command"
 	"github.com/roshbhatia/tether/internal/config"
+	"github.com/roshbhatia/tether/internal/hosts"
 	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
 )
@@ -48,9 +49,10 @@ func main() {
 	update("README.md", []byte(rendered), *check)
 
 	for path, render := range map[string]func() ([]byte, error){
-		"schema/tether.plan.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[plan.Output](plan.Version) },
-		"schema/tether.host.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[probe.Host](probe.HostVersion) },
-		"schema/config.schema.json":         config.Schema,
+		"schema/tether.plan.v1.schema.json":  func() ([]byte, error) { return goconfig.Schema[plan.Output](plan.Version) },
+		"schema/tether.host.v1.schema.json":  func() ([]byte, error) { return goconfig.Schema[probe.Host](probe.HostVersion) },
+		"schema/tether.hosts.v1.schema.json": func() ([]byte, error) { return goconfig.Schema[hosts.Output](hosts.Version) },
+		"schema/config.schema.json":          config.Schema,
 	} {
 		schema, err := render()
 		if err != nil {

@@ -1,12 +1,46 @@
 #compdef tether
 __tether_completion_values_0() {
   local -a values
-  values=( 'auto' 'native' 'roam' 'persist')
+  values=()
+  values+=("${(@f)$('tether' 'hosts' '--names' 2>/dev/null)}")
   compadd -a values
 }
 __tether_completion_values_1() {
   local -a values
+  values=( 'auto' 'native' 'roam' 'persist')
+  compadd -a values
+}
+__tether_completion_values_2() {
+  local -a values
   values=( 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh')
+  compadd -a values
+}
+__tether_completion_values_3() {
+  local -a values
+  values=()
+  values+=("${(@f)$('tether' 'hosts' '--names' 2>/dev/null)}")
+  compadd -a values
+}
+__tether_completion_values_4() {
+  local -a values
+  values=( 'auto' 'native' 'roam' 'persist')
+  compadd -a values
+}
+__tether_completion_values_5() {
+  local -a values
+  values=( 'native-mux' 'mosh-mux' 'ssh-raw' 'ssh')
+  compadd -a values
+}
+__tether_completion_values_6() {
+  local -a values
+  values=()
+  values+=("${(@f)$('tether' 'hosts' '--names' 2>/dev/null)}")
+  compadd -a values
+}
+__tether_completion_values_7() {
+  local -a values
+  values=()
+  values+=("${(@f)$('tether' 'hosts' '--names' 2>/dev/null)}")
   compadd -a values
 }
 
@@ -28,6 +62,12 @@ _tether() {
       continue
     fi
     case "$context:$word" in
+      'connect:--session') consume_value=1; continue ;;
+      'connect:--session='*) continue ;;
+      'connect:--mode') consume_value=1; continue ;;
+      'connect:--mode='*) continue ;;
+      'connect:--pin') consume_value=1; continue ;;
+      'connect:--pin='*) continue ;;
       'plan:--host') consume_value=1; continue ;;
       'plan:--host='*) continue ;;
       'plan:--session') consume_value=1; continue ;;
@@ -47,8 +87,10 @@ _tether() {
     esac
     case "$context:$word" in
       ':completion') context='completion' ;;
+      ':connect') context='connect' ;;
       ':plan') context='plan' ;;
       ':probe') context='probe' ;;
+      ':hosts') context='hosts' ;;
       ':status') context='status' ;;
       ':completion') context='completion' ;;
     esac
@@ -58,36 +100,56 @@ _tether() {
       _arguments \
         '(-h)--help[Print command help]' \
         '--version[Write the version to stdout]' \
-        '1:command:(completion plan probe status completion)'
+        '1:command:(completion connect plan probe hosts status completion)'
 
       ;;
     'completion')
       _arguments \
         '2:shell:(bash zsh fish nu)'
       ;;
+    'connect')
+      _arguments \
+        '--session[Session to attach with zmx or tmux when no inner argv is given; overrides defaults.session]:value:' \
+        '--mode[Ordering mode; overrides the config]:value:__tether_completion_values_1' \
+        '--pin[Tier that must win; overrides the config]:value:__tether_completion_values_2' \
+        '--dry-run[Write the plan JSON and exit without connecting]' \
+        '--quiet[Do not announce the winning hop on stderr]' \
+        '--no-probe[Never run the ssh round trip; plan from the cache only]' \
+        '(-h)--help[Print command help]' \
+        '*:argument:__tether_completion_values_0'
+
+      ;;
     'plan')
       _arguments \
-        '--host[ssh host alias]:value:' \
+        '--host[ssh config alias or tailnet peer]:value:__tether_completion_values_3' \
         '--session[Session name echoed in the output]:value:' \
         '--native[Opaque ref of the callers native mux domain]:value:' \
         '--native-raw[Opaque ref of the callers raw ssh domain]:value:' \
-        '--mode[Ordering mode; overrides the config]:value:__tether_completion_values_0' \
-        '--pin[Tier that must win; overrides the config]:value:__tether_completion_values_1' \
+        '--mode[Ordering mode; overrides the config]:value:__tether_completion_values_4' \
+        '--pin[Tier that must win; overrides the config]:value:__tether_completion_values_5' \
         '(-h)--help[Print command help]' \
         '*:argument:'
 
       ;;
     'probe')
       _arguments \
-        '--host[ssh host alias]:value:' \
+        '--host[ssh config alias or tailnet peer]:value:__tether_completion_values_6' \
         '--force[Probe even inside the unreachable-host backoff]' \
+        '(-h)--help[Print command help]' \
+        '*:argument:'
+
+      ;;
+    'hosts')
+      _arguments \
+        '--json[Write tether.hosts/v1 instead of a table]' \
+        '--names[Write one name per line, for completion]' \
         '(-h)--help[Print command help]' \
         '*:argument:'
 
       ;;
     'status')
       _arguments \
-        '--host[Only this host]:value:' \
+        '--host[Only this host]:value:__tether_completion_values_7' \
         '(-h)--help[Print command help]' \
         '*:argument:'
 

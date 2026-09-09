@@ -1,6 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
+    "Defaults": {
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session connect attaches when --session is absent; empty means a login shell"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "Flaky": {
       "properties": {
         "rtt_ms": {
@@ -40,6 +50,10 @@
             "persist"
           ],
           "description": "Mode for this host; overrides the top-level mode"
+        },
+        "user": {
+          "type": "string",
+          "description": "Remote user; prepended as user@ to the ssh target"
         }
       },
       "additionalProperties": false,
@@ -60,6 +74,9 @@
     "flaky": {
       "$ref": "#/$defs/Flaky"
     },
+    "defaults": {
+      "$ref": "#/$defs/Defaults"
+    },
     "hosts": {
       "additionalProperties": {
         "$ref": "#/$defs/Host"
@@ -71,7 +88,8 @@
   "type": "object",
   "required": [
     "mode",
-    "flaky"
+    "flaky",
+    "defaults"
   ],
   "title": "tether.config/v1"
 }

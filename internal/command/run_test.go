@@ -21,6 +21,8 @@ type fake struct {
 	paths map[string]string
 	runs  map[string]string
 	calls []string
+	env   map[string]string
+	execs [][]string
 }
 
 func (f *fake) tools(now time.Time) *probe.Tools {
@@ -57,19 +59,52 @@ func newFake() *fake {
 	}
 }
 
-func isolate(t *testing.T) {
+// sshConfig is the isolated ~/.ssh/config: arrakis is an alias, vault is not.
+const sshConfig = "Host arrakis\n  HostName arrakis.stork-eel.ts.net\n  User u\nHost *.stork-eel.ts.net\n  User u\n"
+
+func isolate(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
 	t.Setenv("SYSINIT_PATHS_MANIFEST", filepath.Join(dir, "absent.json"))
 	t.Setenv("TETHER_CONFIG", "")
+	path := filepath.Join(dir, "ssh_config")
+	if err := os.WriteFile(path, []byte(sshConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TETHER_TEST_SSH_CONFIG", path)
+	return path
+}
+
+func writeSettings(t *testing.T, content string) {
+	t.Helper()
+	configDir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "tether")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func run(t *testing.T, tools *probe.Tools, args ...string) (int, string, string) {
 	t.Helper()
+	return runWith(t, nil, tools, args...)
+}
+
+func runWith(t *testing.T, f *fake, tools *probe.Tools, args ...string) (int, string, string) {
+	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := Run(args, Streams{Stdout: &stdout, Stderr: &stderr, Version: "test", Tools: tools})
+	streams := Streams{Stdout: &stdout, Stderr: &stderr, Version: "test", Tools: tools, SSHConfig: os.Getenv("TETHER_TEST_SSH_CONFIG")}
+	if f != nil {
+		streams.Getenv = func(key string) string { return f.env[key] }
+		streams.Exec = func(path string, argv []string, _ []string) error {
+			f.execs = append(f.execs, append([]string{path}, argv...))
+			return nil
+		}
+	}
+	code := Run(args, streams)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -165,13 +200,7 @@ func TestProbeThenPlanChoosesFromTheCache(t *testing.T) {
 
 func TestPlanPinnedButUnavailableIsAnError(t *testing.T) {
 	isolate(t)
-	configDir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "tether")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"hosts":{"arrakis":{"pin":"mosh-mux"}}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeSettings(t, `{"hosts":{"arrakis":{"pin":"mosh-mux"}}}`)
 	f := newFake()
 	if code, _, stderr := run(t, f.tools(epoch), "probe", "--host", "arrakis"); code != 0 {
 		t.Fatalf("probe exit %d: %s", code, stderr)
@@ -239,6 +268,9 @@ func TestStatusListsRecords(t *testing.T) {
 	}
 	if output.Version != StatusVersion || len(output.Hosts) != 1 || output.Hosts[0].Host != "arrakis" || output.Hosts[0].AgeS != 60 || output.Hosts[0].Stale || !output.Hosts[0].RemoteOK || output.Hosts[0].Record != nil {
 		t.Fatalf("status: %+v", output)
+	}
+	if tailnet := output.Hosts[0].Tailnet; tailnet == nil || !tailnet.Online || tailnet.Path != "idle" || tailnet.Relay != "sea" || tailnet.TailscaleSSH || tailnet.DNSName != "arrakis.stork-eel.ts.net" {
+		t.Fatalf("tailnet column: %+v", output.Hosts[0].Tailnet)
 	}
 	code, stdout, _ = run(t, f.tools(epoch), "status", "--host", "arrakis")
 	if code != 0 || !strings.Contains(stdout, `"record"`) {

@@ -179,6 +179,10 @@
     "host": {
       "type": "string"
     },
+    "target": {
+      "type": "string",
+      "description": "What ssh and mosh are given when it differs from host"
+    },
     "session": {
       "type": "string"
     },
