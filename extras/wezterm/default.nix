@@ -11,7 +11,14 @@ let
     '';
     postInstall = ''
       mv "$out/bin/wezterm" "$out/bin/tether-picker"
-      wrapProgram "$out/bin/tether-picker" --add-flags "${pkgs.lib.getExe core}"
+      wrapProgram "$out/bin/tether-picker" \
+        --prefix PATH : "${
+          pkgs.lib.makeBinPath [
+            pkgs.tailscale
+            pkgs.openssh
+          ]
+        }" \
+        --add-flags "${pkgs.lib.getExe core}"
     '';
     meta = old.meta // {
       mainProgram = "tether-picker";
