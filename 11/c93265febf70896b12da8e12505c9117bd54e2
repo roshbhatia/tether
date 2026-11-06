@@ -1,0 +1,21 @@
+internal/probe/probe_test.go
+  s_de8d39c3c56992::t_090e31c96f0872 263-268
+internal/hosts/hosts_test.go
+  s_de8d39c3c56992::t_be778c05e5a94d 101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "11c93265febf70896b12da8e12505c9117bd54e2",
+  "prompts": {},
+  "sessions": {
+    "s_de8d39c3c56992": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ad25-3528-7c81-a954-276c13dcabf6",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Roshan Bhatia <rshnbhatia@gmail.com>"
+    }
+  }
+}
