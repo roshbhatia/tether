@@ -259,14 +259,3 @@ func carry(options []sshOption, userOverride bool) carried {
 	}
 	return out
 }
-
-// withUser replaces or adds the user@ part of an ssh target.
-func withUser(user, target string) string {
-	if user == "" {
-		return target
-	}
-	if _, host, ok := strings.Cut(target, "@"); ok {
-		return user + "@" + host
-	}
-	return user + "@" + target
-}

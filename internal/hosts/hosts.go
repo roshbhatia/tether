@@ -84,23 +84,31 @@ func (resolver Resolver) userFor(host string) string {
 	return resolver.UserFor(host)
 }
 
-// Resolve prefers SSH config aliases, then SSH-enabled tailnet peers.
-// Unknown targets are returned unchanged for ordinary SSH resolution.
-func (resolver Resolver) Resolve(ctx context.Context, name string) (Host, bool) {
-	aliases, _ := SSHConfigHosts(resolver.sshConfig())
-	tailnet := probe.LoadTailnet(ctx, resolver.Tools)
-	if alias, ok := matchAlias(name, aliases); ok {
-		return resolver.fromAlias(ctx, alias, tailnet), true
-	}
-	if peer, ok := tailnet.Find(name); ok && peer.TailscaleSSH {
-		return resolver.fromPeer(peer), true
-	}
-	host := Host{Name: name, Hostname: name, Target: withUser(resolver.userFor(name), name)}
-	return host, false
+type Resolution struct {
+	Host     Host
+	Known    bool
+	Local    probe.Local
+	Registry probe.Registry
 }
 
-func (resolver Resolver) fromAlias(ctx context.Context, alias string, tailnet probe.Tailnet) Host {
-	local := probe.LocalLayer(ctx, resolver.Tools, alias)
+// Inspect resolves the target and observes local capabilities once.
+func (resolver Resolver) Inspect(ctx context.Context, name string) Resolution {
+	aliases, _ := SSHConfigHosts(resolver.sshConfig())
+	tailnet := probe.LoadTailnet(ctx, resolver.Tools)
+	host := Host{Name: name, Hostname: name, Target: withUser(resolver.userFor(name), name)}
+	known := false
+	if alias, ok := matchAlias(name, aliases); ok {
+		local := probe.LocalLayer(ctx, resolver.Tools, withUser(resolver.userFor(alias), alias))
+		host = resolver.fromAlias(alias, local, tailnet)
+		return Resolution{host, true, local, tailnet.Registry(host.Name, local.Hostname)}
+	} else if peer, ok := tailnet.Find(name); ok && peer.TailscaleSSH {
+		host, known = resolver.fromPeer(peer), true
+	}
+	local := probe.LocalLayer(ctx, resolver.Tools, host.Target)
+	return Resolution{host, known, local, tailnet.Registry(host.Name, local.Hostname)}
+}
+
+func (resolver Resolver) fromAlias(alias string, local probe.Local, tailnet probe.Tailnet) Host {
 	host := Host{Name: alias, Source: SourceSSHConfig, Hostname: local.Hostname, User: local.User}
 	if user := resolver.userFor(alias); user != "" {
 		host.User = user
@@ -148,7 +156,8 @@ func (resolver Resolver) List(ctx context.Context) (Output, error) {
 	output := Output{Version: Version, SSHConfig: path, Tailnet: tailnet.Present, Hosts: []Host{}}
 	seen := map[string]struct{}{}
 	for _, alias := range aliases {
-		host := resolver.fromAlias(ctx, alias, tailnet)
+		local := probe.LocalLayer(ctx, resolver.Tools, withUser(resolver.userFor(alias), alias))
+		host := resolver.fromAlias(alias, local, tailnet)
 		output.Hosts = append(output.Hosts, host)
 		if host.Peer != nil {
 			seen[host.Peer.Name] = struct{}{}

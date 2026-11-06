@@ -151,17 +151,6 @@ func (tailnet Tailnet) Registry(host, hostname string) Registry {
 	return registry
 }
 
-// RegistryLayer reads the local tailscale daemon. It never opens a connection
-// to the host. With no tailscale, Present is false and the caller falls back to
-// a connect timeout.
-func RegistryLayer(ctx context.Context, tools Tools, host, hostname string) Registry {
-	return LoadTailnet(ctx, tools).Registry(host, hostname)
-}
-
-func parseTailscaleStatus(out []byte, host, hostname string) Registry {
-	return parseTailnet(out).Registry(host, hostname)
-}
-
 func trimDot(name string) string { return strings.TrimSuffix(name, ".") }
 
 func firstLabel(name string) string {

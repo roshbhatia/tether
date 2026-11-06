@@ -18,7 +18,7 @@ import (
 	"github.com/roshbhatia/go-utils/completion"
 	"github.com/roshbhatia/tether/internal/config"
 	"github.com/roshbhatia/tether/internal/hosts"
-	"github.com/roshbhatia/tether/internal/plan"
+	"github.com/roshbhatia/tether/internal/negotiation"
 	"github.com/roshbhatia/tether/internal/probe"
 	"github.com/roshbhatia/tether/internal/rank"
 )
@@ -152,6 +152,10 @@ func (streams Streams) resolver(settings config.Config) hosts.Resolver {
 	return hosts.Resolver{Tools: streams.tools(), SSHConfig: streams.SSHConfig, UserFor: settings.UserFor}
 }
 
+func (streams Streams) coordinator(settings config.Config) negotiation.Coordinator {
+	return negotiation.Coordinator{Tools: streams.tools(), Resolver: streams.resolver(settings), Store: streams.store()}
+}
+
 // Specification is the command tree for completions and docs.
 func Specification() completion.Command { return specification }
 
@@ -234,11 +238,15 @@ func runPlan(args []string, streams Streams) int {
 		return 1
 	}
 	ctx := context.Background()
-	target, _ := streams.resolver(settings).Resolve(ctx, *host)
-	output, err := rankHost(ctx, streams, settings, target, request{
+	facts, err := streams.coordinator(settings).Observe(ctx, *host, "")
+	if err != nil {
+		fmt.Fprintf(streams.Stderr, "tether plan: %v\n", err)
+		return 1
+	}
+	output, err := negotiation.Evaluate(settings, facts, negotiation.Request{
 		Session: *session, Native: *native, NativeRaw: *nativeRaw, Mode: *mode, Pin: *pin, Inner: flags.Args(),
 	})
-	if err != nil && !isRankError(err) {
+	if err != nil && !negotiation.IsRankError(err) {
 		fmt.Fprintf(streams.Stderr, "tether plan: %v\n", err)
 		return 1
 	}
@@ -249,181 +257,6 @@ func runPlan(args []string, streams Streams) int {
 		return 1
 	}
 	return 0
-}
-
-// request is one plan: the caller's refs and overrides plus the inner argv.
-type request struct {
-	Session     string
-	Native      string
-	NativeRaw   string
-	Mode        string
-	Pin         string
-	Inner       []string
-	Flags       plan.Flags
-	MoshUnfit   string
-	NativeUnfit string
-}
-
-// rankError marks a ranking failure, such as an unavailable pin, whose plan
-// document still renders. Other errors are I/O.
-type rankError struct{ err error }
-
-func (err rankError) Error() string { return err.err.Error() }
-func (err rankError) Unwrap() error { return err.err }
-
-func isRankError(err error) bool {
-	var target rankError
-	return errors.As(err, &target)
-}
-
-// rankHost runs the plan layers (never the network) for a resolved host and
-// renders the tether.plan/v1 document.
-func rankHost(ctx context.Context, streams Streams, settings config.Config, target hosts.Host, req request) (plan.Output, error) {
-	prefs := rank.Prefs{
-		Mode:       settings.ModeFor(target.Name),
-		Pin:        settings.PinFor(target.Name),
-		FlakyRTTMs: settings.Flaky.RTTMs,
-		FlakyLoss:  settings.Flaky.Loss,
-	}
-	if req.Mode != "" {
-		prefs.Mode = rank.Mode(req.Mode)
-	}
-	if req.Pin != "" {
-		prefs.Pin = req.Pin
-	}
-
-	tools := streams.tools()
-	now := tools.Now()
-	local := probe.LocalLayer(ctx, tools, target.Target)
-	registry := probe.RegistryLayer(ctx, tools, target.Name, local.Hostname)
-	record, cached, err := streams.store().Read(target.Name)
-	if err != nil {
-		return plan.Output{}, err
-	}
-
-	caps := rank.Caps{
-		LocalMosh:       local.Mosh != "",
-		LocalWezterm:    local.Wezterm != "",
-		LocalSSH:        local.SSH != "",
-		RegistryOffline: registry.Present && registry.Peer && !registry.Online,
-		NativeRef:       req.Native,
-		NativeRawRef:    req.NativeRaw,
-		MoshUnfit:       req.MoshUnfit,
-		NativeUnfit:     req.NativeUnfit,
-	}
-	link := rank.Link{}
-	probeInfo := plan.Probe{Stale: true}
-	facts := []string{}
-	if cached {
-		caps.RemoteKnown = true
-		caps.RemoteOK = record.Remote.OK
-		caps.RemoteReason = record.Remote.Reason
-		caps.RemoteMoshServer = record.Remote.MoshServer != ""
-		caps.RemoteZmx = record.Remote.Zmx != ""
-		caps.RemoteTmux = record.Remote.Tmux != ""
-		caps.RemoteMuxServer = record.Remote.WeztermMuxServer != ""
-		at := record.At
-		age := int(now.Sub(at) / time.Second)
-		probeInfo = plan.Probe{At: &at, AgeS: &age, Stale: record.Stale(now)}
-		if record.LinkFresh(now) {
-			link = rank.Link{Known: true, RTTMs: record.Link.RTTMs, Loss: record.Link.Loss}
-			if record.Link.Direct != nil {
-				link.Relayed = !*record.Link.Direct
-			}
-		}
-		facts = append(facts, remoteFact(record.Remote))
-	} else {
-		facts = append(facts, "remote: no host record; run tether probe --host "+target.Name)
-	}
-	facts = append(facts, localFact(local), registryFact(registry), transportFact(target))
-
-	result, err := rank.Rank(caps, link, prefs)
-	result.Reasons = append(result.Reasons, facts...)
-	if result.Offline {
-		probeInfo.Stale = true
-	}
-	subject := plan.Subject{Host: target.Name, Session: req.Session, Flags: req.Flags}
-	if target.Target != target.Name {
-		subject.Target = target.Target
-	}
-	if err != nil {
-		return plan.Failure(subject, err, result, probeInfo), rankError{err}
-	}
-	return plan.Build(subject, req.Inner, plan.Refs{Native: req.Native, NativeRaw: req.NativeRaw}, result, probeInfo), nil
-}
-
-// transportFact records how ssh reaches the host. The `tailscale ssh` wrapper
-// is never used: it takes its first argument as the host, so neither ssh -t
-// nor mosh --ssh (both put options before the host) can drive it.
-func transportFact(target hosts.Host) string {
-	switch target.Source {
-	case hosts.SourceBoth:
-		fact := "transport: ssh alias " + target.Name + " (ssh config, hostname " + target.Hostname + "; tailnet peer"
-		if target.Peer != nil && target.Peer.TailscaleSSH {
-			fact += ", tailscale ssh advertised"
-		}
-		return fact + ")"
-	case hosts.SourceSSHConfig:
-		return "transport: ssh alias " + target.Name + " (ssh config, hostname " + target.Hostname + ")"
-	case hosts.SourceTailnet:
-		fact := "transport: ssh to " + target.Target + " (tailnet peer, not in ssh config"
-		if target.Peer != nil && target.Peer.TailscaleSSH {
-			fact += "; tailscale ssh advertised"
-		}
-		return fact + ")"
-	default:
-		return "transport: ssh to " + target.Target + " (not in ssh config or advertised as a Tailscale SSH host)"
-	}
-}
-
-func remoteFact(remote probe.Remote) string {
-	if !remote.OK {
-		return "remote: unreachable, " + remote.Reason
-	}
-	var present []string
-	for _, tool := range []struct{ name, path string }{
-		{"mosh-server", remote.MoshServer}, {"zmx", remote.Zmx}, {"tmux", remote.Tmux}, {"wezterm-mux-server", remote.WeztermMuxServer},
-	} {
-		if tool.path == "" {
-			continue
-		}
-		if version := remote.Versions[tool.name]; version != "" {
-			present = append(present, tool.name+" "+strings.TrimPrefix(version, tool.name+" "))
-		} else {
-			present = append(present, tool.name)
-		}
-	}
-	if len(present) == 0 {
-		return "remote: none of mosh-server, zmx, tmux, wezterm-mux-server"
-	}
-	return "remote: " + strings.Join(present, ", ")
-}
-
-func localFact(local probe.Local) string {
-	var parts []string
-	for _, tool := range []struct{ name, path string }{{"mosh", local.Mosh}, {"wezterm", local.Wezterm}, {"ssh", local.SSH}} {
-		state := "absent"
-		if tool.path != "" {
-			state = "present"
-		}
-		parts = append(parts, tool.name+" "+state)
-	}
-	return "local: " + strings.Join(parts, ", ")
-}
-
-func registryFact(registry probe.Registry) string {
-	switch {
-	case !registry.Present:
-		return "registry: tailscale absent"
-	case !registry.Peer:
-		return "registry: host is not a tailnet peer"
-	case !registry.Online:
-		return "registry: peer offline"
-	case registry.Direct:
-		return "registry: peer online, direct path active"
-	default:
-		return "registry: peer online, relay " + registry.Relay
-	}
 }
 
 func runHosts(args []string, streams Streams) int {
@@ -522,8 +355,7 @@ func runProbe(args []string, streams Streams) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	target, _ := streams.resolver(settings).Resolve(ctx, *host)
-	record, err := probe.Run(ctx, streams.tools(), target.Name, probe.Options{Store: streams.Store, Force: *force, Target: target.Target})
+	record, err := streams.coordinator(settings).Probe(ctx, *host, *force)
 	if err != nil {
 		fmt.Fprintf(streams.Stderr, "tether probe: %v\n", err)
 		return 1

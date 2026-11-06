@@ -126,54 +126,21 @@ func (tools Tools) lookPath(name string) string {
 	return path
 }
 
-// Options tune one probe run.
-type Options struct {
-	Store *Store
-	// Force runs the remote layer even inside a negative-cache backoff.
-	Force bool
-	// Target is the argument ssh gets; "" means the host name itself. A
-	// tailnet-only host is keyed by its name and reached by its MagicDNS name.
-	Target string
-}
-
-func (options Options) target(host string) string {
-	if options.Target != "" {
-		return options.Target
-	}
-	return host
-}
-
-// Run measures every layer and writes the host record.
-func Run(ctx context.Context, tools Tools, host string, options Options) (Host, error) {
-	now := tools.Now()
-	store := DefaultStore()
-	if options.Store != nil {
-		store = *options.Store
-	}
-	previous, hadPrevious, _ := store.Read(host)
-
-	target := options.target(host)
-	record := Host{Version: HostVersion, Host: host, Target: target, At: now}
-	record.Local = LocalLayer(ctx, tools, target)
-	record.Registry = RegistryLayer(ctx, tools, host, record.Local.Hostname)
-
+// Measure refreshes remote facts using the operation's existing observations.
+func Measure(ctx context.Context, tools Tools, record Host, previous Host, hadPrevious bool, force bool) Host {
+	now := record.At
 	switch {
-	case hadPrevious && previous.InBackoff(now) && !options.Force:
+	case hadPrevious && previous.InBackoff(now) && !force:
 		record.Remote = previous.Remote
 	default:
 		if skip, reason := GuardsRemote(record.Local.Hostname, record.Registry); skip {
 			record.Remote = Remote{Reason: reason, Versions: map[string]string{}, At: now}
 		} else {
-			record.Remote = RemoteLayer(ctx, tools, target, now)
+			record.Remote = RemoteLayer(ctx, tools, record.Target, now)
 		}
 	}
-
 	if !record.Registry.Peer || record.Registry.Online {
 		record.Link = LinkLayer(ctx, tools, record.Local.Hostname, record.Registry, now)
 	}
-
-	if err := store.Write(record); err != nil {
-		return record, err
-	}
-	return record, nil
+	return record
 }

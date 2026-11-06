@@ -107,7 +107,8 @@ func TestResolveOrderAliasThenTailnetThenUnknown(t *testing.T) {
 		{"elsewhere.example.com", false, "", "elsewhere.example.com", "elsewhere.example.com", nil},
 	}
 	for _, row := range rows {
-		host, known := resolver.Resolve(context.Background(), row.name)
+		resolution := resolver.Inspect(context.Background(), row.name)
+		host, known := resolution.Host, resolution.Known
 		if known != row.known || host.Source != row.source || host.Target != row.target || host.Name != row.host {
 			t.Fatalf("%s: known %v %+v", row.name, known, host)
 		}
@@ -115,11 +116,11 @@ func TestResolveOrderAliasThenTailnetThenUnknown(t *testing.T) {
 			t.Fatalf("%s: online %v", row.name, got)
 		}
 	}
-	host, _ := resolver.Resolve(context.Background(), "vault")
+	host := resolver.Inspect(context.Background(), "vault").Host
 	if !host.Peer.TailscaleSSH {
 		t.Fatalf("vault advertises tailscale ssh: %+v", host.Peer)
 	}
-	host, _ = resolver.Resolve(context.Background(), "lv426")
+	host = resolver.Inspect(context.Background(), "lv426").Host
 	if host.Peer.LastSeen == nil || host.Peer.LastSeen.Year() != 2026 {
 		t.Fatalf("offline peer keeps last seen: %+v", host.Peer)
 	}
@@ -164,7 +165,8 @@ func TestConfiguredPeerWithoutTailscaleSSHRemainsAvailable(t *testing.T) {
 	}
 	for _, host := range output.Hosts {
 		if host.Name == "portfolio" {
-			resolved, known := resolver.Resolve(context.Background(), "portfolio")
+			resolution := resolver.Inspect(context.Background(), "portfolio")
+			resolved, known := resolution.Host, resolution.Known
 			if !known || resolved.Source != SourceBoth || host.Source != SourceBoth || host.Peer.TailscaleSSH {
 				t.Fatalf("configured OpenSSH peer: listed %+v, resolved %+v", host, resolved)
 			}

@@ -90,8 +90,24 @@ func TestCarryMapsSSHOptionsPerTier(t *testing.T) {
 			t.Fatalf("%s:\n got %+v\nwant %+v", row.name, got, want)
 		}
 	}
-	if withUser("ops", "u@h") != "ops@h" || withUser("ops", "h") != "ops@h" || withUser("", "u@h") != "u@h" {
-		t.Fatal("withUser")
+}
+
+func TestLoginOverrideTargetsTheSelectedUser(t *testing.T) {
+	isolate(t)
+	for _, row := range []struct {
+		args   []string
+		target string
+	}{
+		{[]string{"--no-probe", "-l", "ops", "old@arrakis"}, "ops@arrakis"},
+		{[]string{"--no-probe", "old@arrakis"}, "old@arrakis"},
+		{[]string{"--no-probe", "arrakis"}, "arrakis"},
+	} {
+		f := connectFake()
+		code, _, stderr := runTSH(t, f, row.args...)
+		want := [][]string{{"/bin/ssh", "ssh", row.target}}
+		if code != 0 || !reflect.DeepEqual(f.execs, want) {
+			t.Fatalf("%v: %d %s execs=%v", row.args, code, stderr, f.execs)
+		}
 	}
 }
 

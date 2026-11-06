@@ -144,8 +144,12 @@ something other than `host`, such as `ops@vault.stork-eel.ts.net`.
 ## Design notes
 
 - `internal/probe` measures; `internal/rank` decides; `internal/plan` renders;
+  `internal/negotiation` coordinates observations, refresh, and evaluation;
   `internal/command` is the CLI. `rank.Rank` is a pure function and its table
   test is the decision table. Add a row there before changing a rule.
+- Each operation observes local tools, SSH configuration, and Tailscale status
+  once. Planning evaluates those facts without further I/O. Refresh updates the
+  remote inventory and writes through a directory-scoped `probe.Store`.
 - The remote inventory runs under `sh -c '...'` because a remote login shell
   can be nushell, which has no `command -v`. The script holds no single quote.
 - Registry `direct` is `CurAddr != ""`, which is empty on an idle peer. Only a

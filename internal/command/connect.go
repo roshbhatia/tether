@@ -9,6 +9,7 @@ import (
 
 	"github.com/roshbhatia/go-utils/completion"
 	"github.com/roshbhatia/tether/internal/config"
+	"github.com/roshbhatia/tether/internal/negotiation"
 	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
 )
@@ -54,31 +55,30 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		}
 	}
 
-	target, known := streams.resolver(settings).Resolve(ctx, options.host)
+	coordinator := streams.coordinator(settings)
+	facts, observeErr := coordinator.Observe(ctx, options.host, options.user)
+	target, known := facts.Resolution.Host, facts.Resolution.Known
 	if !known {
 		say("%s is not in the ssh config or advertised as a Tailscale SSH host; trying ssh anyway", options.host)
-	}
-	if options.user != "" {
-		target.User = options.user
-		target.Target = withUser(options.user, target.Target)
 	}
 	if target.Peer != nil && !target.Peer.Online {
 		fmt.Fprintf(streams.Stderr, "%s: %s is offline on the tailnet (%s)\n", prog, target.Name, lastSeen(*target.Peer))
 		return 1
 	}
 
-	record, cached, err := streams.store().Read(target.Name)
-	if err != nil {
-		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
+	if observeErr != nil {
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, observeErr)
 		return 1
 	}
+	record, cached := facts.Record, facts.Cached
 	if !options.noProbe && (!cached || record.Stale(tools.Now())) {
 		say("probing %s", target.Name)
-		probed, err := probe.Run(ctx, tools, target.Name, probe.Options{Store: streams.Store, Target: target.Target})
+		refreshed, err := coordinator.Refresh(ctx, facts, false)
 		if err != nil {
 			say("probe failed: %v", err)
 		} else {
-			record, cached = probed, true
+			facts = refreshed
+			record, cached = facts.Record, facts.Cached
 		}
 	}
 
@@ -87,14 +87,14 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		say("%s", note)
 	}
 	flags := carry(options.options, options.user != "")
-	req := request{
+	req := negotiation.Request{
 		Session: options.session, Mode: options.mode, Pin: options.pin, Inner: inner,
 		Flags:       plan.Flags{SSH: flags.ssh, Mosh: flags.mosh, TTY: flags.tty},
 		MoshUnfit:   flags.moshUnfit,
 		NativeUnfit: flags.nativeUnfit,
 	}
-	output, err := rankHost(ctx, streams, settings, target, req)
-	if err != nil && !isRankError(err) {
+	output, err := negotiation.Evaluate(settings, facts, req)
+	if err != nil && !negotiation.IsRankError(err) {
 		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
 		return 1
 	}
