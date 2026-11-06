@@ -67,14 +67,14 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		return 1
 	}
 
-	record, cached, err := probe.Read(target.Name)
+	record, cached, err := streams.store().Read(target.Name)
 	if err != nil {
 		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
 		return 1
 	}
 	if !options.noProbe && (!cached || record.Stale(tools.Now())) {
 		say("probing %s", target.Name)
-		probed, err := probe.Run(ctx, tools, target.Name, probe.Options{Target: target.Target})
+		probed, err := probe.Run(ctx, tools, target.Name, probe.Options{Store: streams.Store, Target: target.Target})
 		if err != nil {
 			say("probe failed: %v", err)
 		} else {

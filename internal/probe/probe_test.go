@@ -103,7 +103,7 @@ func TestRunWritesAVersionedRecord(t *testing.T) {
 	if entries, _ := os.ReadDir(filepath.Dir(want)); len(entries) != 1 {
 		t.Fatalf("temp file left behind: %v", entries)
 	}
-	read, ok, err := Read("arrakis")
+	read, ok, err := DefaultStore().Read("arrakis")
 	if err != nil || !ok || read.Remote.Zmx != "/bin/zmx" {
 		t.Fatalf("Read() = %+v, %v, %v", read, ok, err)
 	}
@@ -200,31 +200,31 @@ func TestRunNegativeCacheBacksOff(t *testing.T) {
 
 func TestReadMissesOnVersionMismatchAndMissingFile(t *testing.T) {
 	setState(t)
-	if _, ok, err := Read("nowhere"); ok || err != nil {
+	if _, ok, err := DefaultStore().Read("nowhere"); ok || err != nil {
 		t.Fatalf("Read(missing) = %v, %v", ok, err)
 	}
-	if err := os.MkdirAll(Dir(), 0o755); err != nil {
+	if err := os.MkdirAll(DefaultStore().Directory, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(Path("old"), []byte(`{"version":"tether.host/v0","host":"old"}`), 0o644); err != nil {
+	if err := os.WriteFile(DefaultStore().Path("old"), []byte(`{"version":"tether.host/v0","host":"old"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := Read("old"); ok || err != nil {
+	if _, ok, err := DefaultStore().Read("old"); ok || err != nil {
 		t.Fatalf("Read(old version) = %v, %v", ok, err)
 	}
-	if err := os.WriteFile(Path("bad"), []byte(`{`), 0o644); err != nil {
+	if err := os.WriteFile(DefaultStore().Path("bad"), []byte(`{`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := Read("bad"); err == nil {
+	if _, _, err := DefaultStore().Read("bad"); err == nil {
 		t.Fatal("Read(bad json) returned no error")
 	}
-	if _, err := List(); err == nil {
+	if _, err := DefaultStore().List(); err == nil {
 		t.Fatal("List() hid a corrupt record")
 	}
-	if err := os.Remove(Path("bad")); err != nil {
+	if err := os.Remove(DefaultStore().Path("bad")); err != nil {
 		t.Fatal(err)
 	}
-	records, err := List()
+	records, err := DefaultStore().List()
 	if err != nil {
 		t.Fatalf("List() error: %v", err)
 	}

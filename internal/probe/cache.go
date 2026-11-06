@@ -12,14 +12,16 @@ import (
 	"github.com/roshbhatia/go-utils/paths"
 )
 
-// Dir is where host records live: $XDG_STATE_HOME/tether/hosts.
-func Dir() string {
-	return filepath.Join(paths.StateHome(), "tether", "hosts")
+type Store struct {
+	Directory string
 }
 
-// Path is the record file for one host.
-func Path(host string) string {
-	return filepath.Join(Dir(), safeName(host)+".json")
+func DefaultStore() Store {
+	return Store{Directory: filepath.Join(paths.StateHome(), "tether", "hosts")}
+}
+
+func (store Store) Path(host string) string {
+	return filepath.Join(store.Directory, safeName(host)+".json")
 }
 
 func safeName(host string) string {
@@ -35,8 +37,8 @@ func safeName(host string) string {
 
 // Read loads the record. A missing file or a version mismatch is a miss, not
 // an error.
-func Read(host string) (Host, bool, error) {
-	raw, err := os.ReadFile(Path(host))
+func (store Store) Read(host string) (Host, bool, error) {
+	raw, err := os.ReadFile(store.Path(host))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Host{}, false, nil
@@ -45,7 +47,7 @@ func Read(host string) (Host, bool, error) {
 	}
 	var record Host
 	if err := json.Unmarshal(raw, &record); err != nil {
-		return Host{}, false, fmt.Errorf("decode %s: %w", Path(host), err)
+		return Host{}, false, fmt.Errorf("decode %s: %w", store.Path(host), err)
 	}
 	if record.Version != HostVersion {
 		return Host{}, false, nil
@@ -58,8 +60,8 @@ func Read(host string) (Host, bool, error) {
 
 // Write stores the record with an atomic rename, so a reader never sees a
 // partial file.
-func Write(record Host) error {
-	path := Path(record.Host)
+func (store Store) Write(record Host) error {
+	path := store.Path(record.Host)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create host record directory: %w", err)
 	}
@@ -90,8 +92,8 @@ func Write(record Host) error {
 
 // List returns every readable record, sorted by host. Records of another
 // version are skipped, like Read.
-func List() ([]Host, error) {
-	entries, err := os.ReadDir(Dir())
+func (store Store) List() ([]Host, error) {
+	entries, err := os.ReadDir(store.Directory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -104,7 +106,7 @@ func List() ([]Host, error) {
 		if entry.IsDir() || !strings.HasSuffix(name, ".json") || strings.HasPrefix(name, ".") {
 			continue
 		}
-		record, ok, err := Read(strings.TrimSuffix(name, ".json"))
+		record, ok, err := store.Read(strings.TrimSuffix(name, ".json"))
 		if err != nil {
 			return nil, err
 		}

@@ -105,6 +105,7 @@ var specification = completion.Command{
 
 // Streams are the process edges, injected for tests.
 type Streams struct {
+	Store   *probe.Store
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Version string
@@ -117,6 +118,13 @@ type Streams struct {
 	Getenv func(key string) string
 	// SSHConfig defaults to ~/.ssh/config.
 	SSHConfig string
+}
+
+func (streams Streams) store() probe.Store {
+	if streams.Store != nil {
+		return *streams.Store
+	}
+	return probe.DefaultStore()
 }
 
 func (streams Streams) tools() probe.Tools {
@@ -288,7 +296,7 @@ func rankHost(ctx context.Context, streams Streams, settings config.Config, targ
 	now := tools.Now()
 	local := probe.LocalLayer(ctx, tools, target.Target)
 	registry := probe.RegistryLayer(ctx, tools, target.Name, local.Hostname)
-	record, cached, err := probe.Read(target.Name)
+	record, cached, err := streams.store().Read(target.Name)
 	if err != nil {
 		return plan.Output{}, err
 	}
@@ -515,7 +523,7 @@ func runProbe(args []string, streams Streams) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	target, _ := streams.resolver(settings).Resolve(ctx, *host)
-	record, err := probe.Run(ctx, streams.tools(), target.Name, probe.Options{Force: *force, Target: target.Target})
+	record, err := probe.Run(ctx, streams.tools(), target.Name, probe.Options{Store: streams.Store, Force: *force, Target: target.Target})
 	if err != nil {
 		fmt.Fprintf(streams.Stderr, "tether probe: %v\n", err)
 		return 1
@@ -583,7 +591,7 @@ func runStatus(args []string, streams Streams) int {
 	}
 	var records []probe.Host
 	if *host != "" {
-		record, ok, err := probe.Read(*host)
+		record, ok, err := streams.store().Read(*host)
 		if err != nil {
 			fmt.Fprintf(streams.Stderr, "tether status: %v\n", err)
 			return 1
@@ -591,21 +599,21 @@ func runStatus(args []string, streams Streams) int {
 		if ok {
 			records = []probe.Host{record}
 		}
-	} else if records, err = probe.List(); err != nil {
+	} else if records, err = streams.store().List(); err != nil {
 		fmt.Fprintf(streams.Stderr, "tether status: %v\n", err)
 		return 1
 	}
 	tools := streams.tools()
 	now := tools.Now()
 	tailnet := probe.LoadTailnet(context.Background(), tools)
-	output := statusOutput{Version: StatusVersion, StateDir: probe.Dir(), Config: config.Path(), Hosts: []statusRecord{}}
+	output := statusOutput{Version: StatusVersion, StateDir: streams.store().Directory, Config: config.Path(), Hosts: []statusRecord{}}
 	for _, record := range records {
 		record := record
 		entry := statusRecord{
 			Host: record.Host, At: record.At.UTC().Format(time.RFC3339), AgeS: int(now.Sub(record.At) / time.Second),
 			Stale: record.Stale(now), RemoteOK: record.Remote.OK, Reason: record.Remote.Reason,
 			Backoff: record.InBackoff(now), LinkFresh: record.LinkFresh(now),
-			Pin: settings.PinFor(record.Host), Mode: string(settings.ModeFor(record.Host)), Path: probe.Path(record.Host),
+			Pin: settings.PinFor(record.Host), Mode: string(settings.ModeFor(record.Host)), Path: streams.store().Path(record.Host),
 		}
 		if peer, ok := tailnet.Find(record.Host, record.Local.Hostname); ok {
 			entry.Tailnet = tailnetStatusFor(peer)

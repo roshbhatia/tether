@@ -128,6 +128,7 @@ func (tools Tools) lookPath(name string) string {
 
 // Options tune one probe run.
 type Options struct {
+	Store *Store
 	// Force runs the remote layer even inside a negative-cache backoff.
 	Force bool
 	// Target is the argument ssh gets; "" means the host name itself. A
@@ -145,7 +146,11 @@ func (options Options) target(host string) string {
 // Run measures every layer and writes the host record.
 func Run(ctx context.Context, tools Tools, host string, options Options) (Host, error) {
 	now := tools.Now()
-	previous, hadPrevious, _ := Read(host)
+	store := DefaultStore()
+	if options.Store != nil {
+		store = *options.Store
+	}
+	previous, hadPrevious, _ := store.Read(host)
 
 	target := options.target(host)
 	record := Host{Version: HostVersion, Host: host, Target: target, At: now}
@@ -167,7 +172,7 @@ func Run(ctx context.Context, tools Tools, host string, options Options) (Host, 
 		record.Link = LinkLayer(ctx, tools, record.Local.Hostname, record.Registry, now)
 	}
 
-	if err := Write(record); err != nil {
+	if err := store.Write(record); err != nil {
 		return record, err
 	}
 	return record, nil
