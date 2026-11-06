@@ -1,0 +1,45 @@
+internal/command/connect.go
+  s_de8d39c3c56992::t_a5cea493510d4a 12,58-60,69-70,73,76,80-81,90,96
+  s_de8d39c3c56992::t_196bb4c9a5671d 97
+internal/command/run.go
+  s_de8d39c3c56992::t_a5cea493510d4a 21,155-158,241-246,249,358
+internal/hosts/hosts.go
+  s_de8d39c3c56992::t_c082f2296cbce8 87-95,98-99,101-105,107-108,111,159-160
+internal/negotiation/coordinator_test.go
+  s_de8d39c3c56992::t_b0989d9a397e47 5,16-36,104,150,169,194
+  s_de8d39c3c56992::t_3daa0cf3c97e40 12-13,37,48-77,79,91-92,100,110,113,116,119,122,125,128,132,135,139,144,146,156,159,164-165,176,179,182,186,189-190,200,203,206,214,217,222,228-229
+internal/command/observations_test.go
+  s_de8d39c3c56992::t_b0989d9a397e47 1-47,50
+  s_de8d39c3c56992::t_c7029552611b6a 48-49,51-64
+README.md
+  s_de8d39c3c56992::t_b0989d9a397e47 147,150-152
+internal/probe/probe_test.go
+  s_de8d39c3c56992::t_705556652c0fe2 13-14
+internal/command/tsh_test.go
+  s_de8d39c3c56992::t_705556652c0fe2 93-105,107
+  s_de8d39c3c56992::t_1cf942737d16fc 106,108-110
+internal/negotiation/coordinator.go
+  s_de8d39c3c56992::t_d74538dc28e9a0 1-53
+internal/hosts/hosts_test.go
+  s_de8d39c3c56992::t_3daa0cf3c97e40 110-111,119,123,168-169
+internal/negotiation/plan.go
+  s_de8d39c3c56992::t_77a42701cb24e4 1-183
+internal/probe/probe.go
+  s_de8d39c3c56992::t_4a6a38890eb96f 129-131,133,139,145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "747c194c24e4c2b55045478032387a83a69279bd",
+  "prompts": {},
+  "sessions": {
+    "s_de8d39c3c56992": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ad25-3528-7c81-a954-276c13dcabf6",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Roshan Bhatia <rshnbhatia@gmail.com>"
+    }
+  }
+}
