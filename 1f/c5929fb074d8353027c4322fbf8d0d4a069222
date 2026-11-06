@@ -1,0 +1,29 @@
+internal/probe/probe.go
+  s_de8d39c3c56992::t_e813a692560c60 81-98
+internal/negotiation/coordinator.go
+  s_de8d39c3c56992::t_e813a692560c60 33-35
+internal/command/connect.go
+  s_de8d39c3c56992::t_e813a692560c60 74
+internal/command/observations_test.go
+  s_de8d39c3c56992::t_cb9de0d0d5e14a 7,66-161
+internal/negotiation/coordinator_test.go
+  s_de8d39c3c56992::t_29032862c1030c 242-281
+internal/probe/probe_test.go
+  s_de8d39c3c56992::t_1a081a9568d97c 143-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1fc5929fb074d8353027c4322fbf8d0d4a069222",
+  "prompts": {},
+  "sessions": {
+    "s_de8d39c3c56992": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ad25-3528-7c81-a954-276c13dcabf6",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Roshan Bhatia <rshnbhatia@gmail.com>"
+    }
+  }
+}
