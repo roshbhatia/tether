@@ -176,6 +176,9 @@ nix build
 nix flake check
 ```
 
+Demo recording tools are available separately with `nix develop .#demos`.
+Run `python3 hack/extra-demos.py` from that shell to record the extras.
+
 ## tsh
 <!-- BEGIN GENERATED:tsh -->
 

@@ -157,8 +157,6 @@
             packages = [
               pkgs.uv
               pkgs.python3
-              pkgs.vhs
-              pkgs.ffmpeg
               pkgs.git
               pkgs.go
               pkgs.actionlint
@@ -177,6 +175,13 @@
             shellHook = ''
               export GOTOOLCHAIN=local
             '';
+          };
+          demos = pkgs.mkShellNoCC {
+            inputsFrom = [ self.devShells.${system}.default ];
+            packages = [
+              pkgs.vhs
+              pkgs.ffmpeg
+            ];
           };
         }
       );
