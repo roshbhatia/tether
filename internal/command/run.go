@@ -26,8 +26,8 @@ import (
 // StatusVersion tags the status output.
 const StatusVersion = "tether.status/v1"
 
-var tierNames = []string{rank.NativeMux, rank.MoshMux, rank.SSHRaw, rank.SSH}
-var modeNames = []string{string(config.ModeAuto), string(config.ModeNative), string(config.ModeRoam), string(config.ModePersist)}
+var tierNames = rank.TierNames()
+var modeNames = rank.ModeNames()
 
 var specification = completion.Command{
 	Name:            "tether",
@@ -272,7 +272,7 @@ func isRankError(err error) bool {
 // renders the tether.plan/v1 document.
 func rankHost(ctx context.Context, streams Streams, settings config.Config, target hosts.Host, req request) (plan.Output, error) {
 	prefs := rank.Prefs{
-		Mode:       rank.Mode(settings.ModeFor(target.Name)),
+		Mode:       settings.ModeFor(target.Name),
 		Pin:        settings.PinFor(target.Name),
 		FlakyRTTMs: settings.Flaky.RTTMs,
 		FlakyLoss:  settings.Flaky.Loss,

@@ -1,10 +1,45 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+
+	"github.com/roshbhatia/tether/internal/rank"
 )
+
+func TestSchemaMatchesRankingVocabulary(t *testing.T) {
+	t.Parallel()
+	type property struct {
+		Enum []string `json:"enum"`
+	}
+	var schema struct {
+		Properties map[string]property `json:"properties"`
+		Defs       map[string]struct {
+			Properties map[string]property `json:"properties"`
+		} `json:"$defs"`
+	}
+	data, err := Schema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	for name, got := range map[string][]string{
+		"default mode": schema.Properties["mode"].Enum,
+		"host mode":    schema.Defs["Host"].Properties["mode"].Enum,
+	} {
+		if !reflect.DeepEqual(got, rank.ModeNames()) {
+			t.Fatalf("%s: %v", name, got)
+		}
+	}
+	if got := schema.Defs["Host"].Properties["pin"].Enum; !reflect.DeepEqual(got, rank.TierNames()) {
+		t.Fatalf("pins: %v", got)
+	}
+}
 
 func TestLoadDefaultsWithoutFile(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -14,7 +49,7 @@ func TestLoadDefaultsWithoutFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	if loaded.Mode != ModeAuto || loaded.Flaky.RTTMs != 60 || loaded.Flaky.Loss != 0 {
+	if loaded.Mode != rank.ModeAuto || loaded.Flaky.RTTMs != 60 || loaded.Flaky.Loss != 0 {
 		t.Fatalf("unexpected defaults: %+v", loaded)
 	}
 }
@@ -32,10 +67,10 @@ func TestLoadReadsJSONPinsAndModes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	if loaded.Mode != ModeRoam || loaded.Flaky.RTTMs != 80 || loaded.Flaky.Loss != 0.1 {
+	if loaded.Mode != rank.ModeRoam || loaded.Flaky.RTTMs != 80 || loaded.Flaky.Loss != 0.1 {
 		t.Fatalf("unexpected config: %+v", loaded)
 	}
-	if loaded.PinFor("arrakis") != "mosh-mux" || loaded.ModeFor("arrakis") != ModePersist || loaded.ModeFor("other") != ModeRoam {
+	if loaded.PinFor("arrakis") != "mosh-mux" || loaded.ModeFor("arrakis") != rank.ModePersist || loaded.ModeFor("other") != rank.ModeRoam {
 		t.Fatalf("unexpected host lookup: %+v", loaded.Hosts)
 	}
 }
@@ -92,7 +127,7 @@ func TestLoadReadsHostUser(t *testing.T) {
 	if loaded.UserFor("vault") != "ops" || loaded.UserFor("other") != "" {
 		t.Fatalf("loaded: %+v", loaded)
 	}
-	if loaded.Mode != ModeAuto || loaded.Flaky.RTTMs != 60 {
+	if loaded.Mode != rank.ModeAuto || loaded.Flaky.RTTMs != 60 {
 		t.Fatalf("defaults lost: %+v", loaded)
 	}
 }

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	goconfig "github.com/roshbhatia/go-utils/config"
 	"github.com/roshbhatia/go-utils/paths"
+	"github.com/roshbhatia/tether/internal/rank"
 )
 
 const (
@@ -15,24 +17,6 @@ const (
 	EnvPrefix = "TETHER"
 	Version   = "tether.config/v1"
 )
-
-// Mode orders the surviving tiers.
-type Mode string
-
-const (
-	ModeAuto    Mode = "auto"
-	ModeNative  Mode = "native"
-	ModeRoam    Mode = "roam"
-	ModePersist Mode = "persist"
-)
-
-var modes = map[Mode]struct{}{ModeAuto: {}, ModeNative: {}, ModeRoam: {}, ModePersist: {}}
-
-// Valid reports whether the mode is one tether knows.
-func (mode Mode) Valid() bool {
-	_, ok := modes[mode]
-	return ok
-}
 
 // Flaky holds the link thresholds that make auto mode prefer the roaming tier.
 type Flaky struct {
@@ -42,21 +26,21 @@ type Flaky struct {
 
 // Host holds per-host overrides.
 type Host struct {
-	Pin  string `json:"pin,omitempty" yaml:"pin" jsonschema:"enum=native-mux,enum=mosh-mux,enum=ssh-raw,enum=ssh,description=Tier that always wins; an unavailable pin is an error"`
-	Mode Mode   `json:"mode,omitempty" yaml:"mode" jsonschema:"enum=auto,enum=native,enum=roam,enum=persist,description=Mode for this host; overrides the top-level mode"`
-	User string `json:"user,omitempty" yaml:"user" jsonschema:"description=Remote user; prepended as user@ to the ssh target"`
+	Pin  string    `json:"pin,omitempty" yaml:"pin" jsonschema:"enum=native-mux,enum=mosh-mux,enum=ssh-raw,enum=ssh,description=Tier that always wins; an unavailable pin is an error"`
+	Mode rank.Mode `json:"mode,omitempty" yaml:"mode" jsonschema:"enum=auto,enum=native,enum=roam,enum=persist,description=Mode for this host; overrides the top-level mode"`
+	User string    `json:"user,omitempty" yaml:"user" jsonschema:"description=Remote user; prepended as user@ to the ssh target"`
 }
 
 // Config is the whole configuration file.
 type Config struct {
-	Mode  Mode            `json:"mode" yaml:"mode" jsonschema:"enum=auto,enum=native,enum=roam,enum=persist,description=Default ordering mode"`
+	Mode  rank.Mode       `json:"mode" yaml:"mode" jsonschema:"enum=auto,enum=native,enum=roam,enum=persist,description=Default ordering mode"`
 	Flaky Flaky           `json:"flaky" yaml:"flaky"`
 	Hosts map[string]Host `json:"hosts,omitempty" yaml:"hosts"`
 }
 
 // Default is the configuration with no file present.
 func Default() Config {
-	return Config{Mode: ModeAuto, Flaky: Flaky{RTTMs: 60, Loss: 0}}
+	return Config{Mode: rank.ModeAuto, Flaky: Flaky{RTTMs: 60, Loss: 0}}
 }
 
 // Path is the configuration file location: $TETHER_CONFIG, else
@@ -80,18 +64,18 @@ func Load() (Config, error) {
 // Validate rejects an unknown mode.
 func (config Config) Validate() error {
 	if !config.Mode.Valid() {
-		return fmt.Errorf("mode %q is not one of auto, native, roam, persist", config.Mode)
+		return fmt.Errorf("mode %q is not one of %s", config.Mode, strings.Join(rank.ModeNames(), ", "))
 	}
 	for name, host := range config.Hosts {
 		if host.Mode != "" && !host.Mode.Valid() {
-			return fmt.Errorf("hosts.%s.mode %q is not one of auto, native, roam, persist", name, host.Mode)
+			return fmt.Errorf("hosts.%s.mode %q is not one of %s", name, host.Mode, strings.Join(rank.ModeNames(), ", "))
 		}
 	}
 	return nil
 }
 
 // ModeFor returns the host's mode, else the default.
-func (config Config) ModeFor(host string) Mode {
+func (config Config) ModeFor(host string) rank.Mode {
 	if entry, ok := config.Hosts[host]; ok && entry.Mode != "" {
 		return entry.Mode
 	}

@@ -36,6 +36,19 @@ const (
 	ModePersist Mode = "persist"
 )
 
+func ModeNames() []string {
+	return []string{string(ModeAuto), string(ModeNative), string(ModeRoam), string(ModePersist)}
+}
+
+func (mode Mode) Valid() bool {
+	for _, name := range ModeNames() {
+		if string(mode) == name {
+			return true
+		}
+	}
+	return false
+}
+
 // Tier is one way to carry the inner command, best first by Rank.
 type Tier struct {
 	Name  string   `json:"tier"`
@@ -68,6 +81,14 @@ func TierNamed(name string) (Tier, bool) {
 		}
 	}
 	return Tier{}, false
+}
+
+func TierNames() []string {
+	names := make([]string, 0, len(Tiers))
+	for _, tier := range Tiers {
+		names = append(names, tier.Name)
+	}
+	return names
 }
 
 // Caps is what both ends can do, as the probe layers reported it.
@@ -155,8 +176,8 @@ func Rank(caps Caps, link Link, prefs Prefs) (Result, error) {
 	if prefs.Mode == "" {
 		prefs.Mode = ModeAuto
 	}
-	if _, ok := modeOrder[prefs.Mode]; !ok && prefs.Mode != ModeAuto {
-		return Result{}, fmt.Errorf("mode %q is not one of auto, native, roam, persist", prefs.Mode)
+	if !prefs.Mode.Valid() {
+		return Result{}, fmt.Errorf("mode %q is not one of %s", prefs.Mode, strings.Join(ModeNames(), ", "))
 	}
 	if prefs.Pin != "" {
 		if _, ok := TierNamed(prefs.Pin); !ok {
