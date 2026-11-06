@@ -140,3 +140,13 @@ func TestRemoteScriptHasNoSingleQuotes(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectionCompatibilityPreservesLegacyRecords(t *testing.T) {
+	t.Parallel()
+	record := Host{Host: "arrakis", Local: Local{Hostname: "arrakis.example", User: "u", Port: 22}}
+	local := record.Local
+	local.Mosh = "/new/local/mosh"
+	if !record.MatchesConnection("arrakis", local) {
+		t.Fatal("optional target or local tool change invalidated compatible inventory")
+	}
+}

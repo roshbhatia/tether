@@ -78,6 +78,24 @@ type Host struct {
 	Link     *Link     `json:"link" jsonschema:"nullable,description=Latest link sample; null when the host was not sampled"`
 }
 
+// MatchesConnection checks the identity used to collect the remote inventory.
+func (host Host) MatchesConnection(target string, local Local) bool {
+	previousTarget := host.Target
+	if previousTarget == "" {
+		previousTarget = host.Host
+	}
+	return previousTarget == target && host.Local.Hostname == local.Hostname &&
+		host.Local.User == local.User && host.Local.Port == local.Port
+}
+
+// NeedsRemoteProbe applies the failure backoff or successful inventory lifetime.
+func (host Host) NeedsRemoteProbe(now time.Time) bool {
+	if !host.Remote.OK {
+		return !host.InBackoff(now)
+	}
+	return host.Stale(now)
+}
+
 // Stale reports whether the record is older than HostTTL.
 func (host Host) Stale(now time.Time) bool {
 	return now.Sub(host.At) > HostTTL

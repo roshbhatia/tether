@@ -239,3 +239,43 @@ func TestRunNegativeCacheBacksOff(t *testing.T) {
 		t.Fatalf("forced Run() = %+v, %v", third.Remote, err)
 	}
 }
+
+func TestObserveDiscardsAnotherConnectionsBackoff(t *testing.T) {
+	t.Parallel()
+	f := fullFake()
+	tools := f.tools(epoch)
+	store := probe.Store{Directory: t.TempDir()}
+	coordinator := Coordinator{Tools: tools, Resolver: hosts.Resolver{Tools: tools, SSHConfig: filepath.Join(store.Directory, "absent")}, Store: store}
+	f.fails["ssh -o BatchMode"] = "permission denied"
+	if _, err := coordinator.Probe(context.Background(), "arrakis", false); err != nil {
+		t.Fatal(err)
+	}
+	delete(f.fails, "ssh -o BatchMode")
+	f.calls = nil
+	facts, err := coordinator.Observe(context.Background(), "arrakis", "ops")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if facts.Cached || facts.Record.Remote.Reason != "" {
+		t.Fatalf("another account's failure survived: %+v", facts)
+	}
+	facts, err = coordinator.Refresh(context.Background(), facts, false)
+	if err != nil || !facts.Record.Remote.OK {
+		t.Fatalf("new account stayed in backoff: %+v %v", facts.Record, err)
+	}
+	if facts.Record.Target != "ops@arrakis" {
+		t.Fatalf("target=%s", facts.Record.Target)
+	}
+	var probes int
+	for _, call := range f.calls {
+		if strings.HasPrefix(call, "ssh -o BatchMode") {
+			probes++
+			if !strings.Contains(call, "ops@arrakis --") {
+				t.Fatalf("wrong remote target: %s", call)
+			}
+		}
+	}
+	if probes != 1 {
+		t.Fatalf("remote probes=%d", probes)
+	}
+}

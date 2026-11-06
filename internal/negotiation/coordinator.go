@@ -30,6 +30,9 @@ func (coordinator Coordinator) Observe(ctx context.Context, name, user string) (
 	facts := Facts{Resolution: resolution, Now: coordinator.Tools.Now()}
 	var err error
 	facts.Record, facts.Cached, err = coordinator.Store.Read(resolution.Host.Name)
+	if facts.Cached && !facts.Record.MatchesConnection(resolution.Host.Target, resolution.Local) {
+		facts.Record, facts.Cached = probe.Host{}, false
+	}
 	return facts, err
 }
 

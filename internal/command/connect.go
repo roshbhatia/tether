@@ -71,7 +71,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		return 1
 	}
 	record, cached := facts.Record, facts.Cached
-	if !options.noProbe && (!cached || record.Stale(tools.Now())) {
+	if !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
 		say("probing %s", target.Name)
 		refreshed, err := coordinator.Refresh(ctx, facts, false)
 		if err != nil {
