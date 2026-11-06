@@ -260,6 +260,12 @@ func TestParseTailscaleStatusMatchesByEveryName(t *testing.T) {
 	if !registry.Present || registry.Peer {
 		t.Fatalf("non-peer: %+v", registry)
 	}
+	for _, hostname := range []string{"arrakis.example.com", "arrakis.other-tail.ts.net"} {
+		registry := parseTailscaleStatus(status, hostname, hostname)
+		if registry.Peer {
+			t.Fatalf("unrelated DNS name %s matched a peer: %+v", hostname, registry)
+		}
+	}
 	if registry := parseTailscaleStatus([]byte("garbage"), "a", "a"); registry.Present {
 		t.Fatalf("garbage parsed: %+v", registry)
 	}

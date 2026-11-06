@@ -117,7 +117,6 @@ func (tailnet Tailnet) Find(names ...string) (Peer, bool) {
 			continue
 		}
 		want[strings.ToLower(trimDot(name))] = struct{}{}
-		want[strings.ToLower(firstLabel(name))] = struct{}{}
 	}
 	for _, peer := range tailnet.Peers {
 		candidates := append([]string{peer.Name, peer.HostName, peer.DNSName}, peer.IPs...)

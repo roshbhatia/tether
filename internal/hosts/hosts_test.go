@@ -98,6 +98,7 @@ func TestResolveOrderAliasThenTailnetThenUnknown(t *testing.T) {
 		{"lan-only", true, SourceSSHConfig, "root@lan-only", "lan-only", nil},
 		{"vault", true, SourceTailnet, "ops@vault.stork-eel.ts.net", "vault", ptr(true)},
 		{"vault.stork-eel.ts.net", true, SourceTailnet, "ops@vault.stork-eel.ts.net", "vault", ptr(true)},
+		{"vault.example.com", false, "", "vault.example.com", "vault.example.com", nil},
 		{"100.94.4.109", true, SourceTailnet, "arrakis.stork-eel.ts.net", "arrakis", ptr(true)},
 		{"lv426", true, SourceTailnet, "lv426.stork-eel.ts.net", "lv426", ptr(false)},
 		{"portfolio", false, "", "portfolio", "portfolio", nil},
