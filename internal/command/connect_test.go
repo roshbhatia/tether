@@ -21,7 +21,8 @@ func connectFake() *fake {
 	f.runs["tailscale status --json"] = `{"Self":{"HostName":"urth","DNSName":"urth.stork-eel.ts.net."},"Peer":{
 		"k1":{"HostName":"arrakis","DNSName":"arrakis.stork-eel.ts.net.","OS":"linux","Online":true,"Relay":"sea","CurAddr":"192.168.50.18:41641"},
 		"k2":{"HostName":"vault","DNSName":"vault.stork-eel.ts.net.","OS":"linux","Online":true,"sshHostKeys":["ssh-ed25519 AAAA"]},
-		"k3":{"HostName":"lv426","DNSName":"lv426.stork-eel.ts.net.","OS":"macOS","Online":false,"LastSeen":"2026-09-05T06:42:59.1Z"}}}`
+		"k3":{"HostName":"lv426","DNSName":"lv426.stork-eel.ts.net.","OS":"macOS","Online":false,"LastSeen":"2026-09-05T06:42:59.1Z","sshHostKeys":["ssh-ed25519 AAAA"]},
+		"k4":{"HostName":"phone","DNSName":"phone.stork-eel.ts.net.","OS":"iOS","Online":true}}}`
 	f.runs["tailscale ping"] = "pong from arrakis (100.94.4.109) via 192.168.50.18:41641 in 2ms\n"
 	f.runs["wezterm cli list --format json"] = "[]"
 	f.runs["wezterm cli spawn"] = "7\n"
@@ -215,7 +216,7 @@ func TestConnectNoProbeAndUnknownHost(t *testing.T) {
 	}
 	f.execs = nil
 	code, _, stderr = runWith(t, f, f.tools(epoch), "connect", "--no-probe", "elsewhere.example.com")
-	if code != 0 || !strings.Contains(stderr, "elsewhere.example.com is not in the ssh config and not a tailnet peer; trying ssh anyway") {
+	if code != 0 || !strings.Contains(stderr, "elsewhere.example.com is not in the ssh config or advertised as a Tailscale SSH host; trying ssh anyway") {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
 	if !reflect.DeepEqual(f.execs, [][]string{{"/bin/ssh", "ssh", "elsewhere.example.com"}}) {
@@ -262,7 +263,7 @@ func TestHostsTableJSONAndNames(t *testing.T) {
 	}
 	want := []string{
 		"arrakis both arrakis.stork-eel.ts.net yes linux no",
-		"lv426 tailnet lv426.stork-eel.ts.net no (seen 2026-09-05) macOS no",
+		"lv426 tailnet lv426.stork-eel.ts.net no (seen 2026-09-05) macOS yes",
 		"vault tailnet vault.stork-eel.ts.net yes linux yes",
 	}
 	if !reflect.DeepEqual(rows, want) {

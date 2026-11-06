@@ -56,7 +56,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 
 	target, known := streams.resolver(settings).Resolve(ctx, options.host)
 	if !known {
-		say("%s is not in the ssh config and not a tailnet peer; trying ssh anyway", options.host)
+		say("%s is not in the ssh config or advertised as a Tailscale SSH host; trying ssh anyway", options.host)
 	}
 	if options.user != "" {
 		target.User = options.user

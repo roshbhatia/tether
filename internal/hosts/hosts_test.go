@@ -15,10 +15,10 @@ import (
 const status = `{"Self":{"HostName":"urth","DNSName":"urth.stork-eel.ts.net.","OS":"macOS","Online":true},
 "MagicDNSSuffix":"stork-eel.ts.net",
 "Peer":{
- "k1":{"HostName":"arrakis","DNSName":"arrakis.stork-eel.ts.net.","OS":"linux","TailscaleIPs":["100.94.4.109"],"Online":true,"Relay":"sea","CurAddr":"192.168.50.18:41641"},
- "k2":{"HostName":"lv426","DNSName":"lv426.stork-eel.ts.net.","OS":"macOS","Online":false,"LastSeen":"2026-09-05T06:42:59.1Z"},
+ "k1":{"HostName":"arrakis","DNSName":"arrakis.stork-eel.ts.net.","OS":"linux","TailscaleIPs":["100.94.4.109"],"Online":true,"Relay":"sea","CurAddr":"192.168.50.18:41641","sshHostKeys":["ssh-ed25519 AAAA"]},
+ "k2":{"HostName":"lv426","DNSName":"lv426.stork-eel.ts.net.","OS":"macOS","Online":false,"LastSeen":"2026-09-05T06:42:59.1Z","sshHostKeys":["ssh-ed25519 AAAA"]},
  "k3":{"HostName":"portfolio","DNSName":"portfolio.stork-eel.ts.net.","OS":"linux","Tags":["tag:k8s"],"Online":true},
- "k4":{"HostName":"portfolio","DNSName":"portfolio-1.stork-eel.ts.net.","OS":"linux","Tags":["tag:k8s"],"Online":true},
+ "k4":{"HostName":"portfolio","DNSName":"portfolio-1.stork-eel.ts.net.","OS":"linux","Tags":["tag:k8s"],"Online":true,"sshHostKeys":[]},
  "k5":{"HostName":"vault","DNSName":"vault.stork-eel.ts.net.","OS":"linux","Online":true,"sshHostKeys":["ssh-ed25519 AAAA"]}
 }}`
 
@@ -100,6 +100,9 @@ func TestResolveOrderAliasThenTailnetThenUnknown(t *testing.T) {
 		{"vault.stork-eel.ts.net", true, SourceTailnet, "ops@vault.stork-eel.ts.net", "vault", ptr(true)},
 		{"100.94.4.109", true, SourceTailnet, "arrakis.stork-eel.ts.net", "arrakis", ptr(true)},
 		{"lv426", true, SourceTailnet, "lv426.stork-eel.ts.net", "lv426", ptr(false)},
+		{"portfolio", false, "", "portfolio", "portfolio", nil},
+		{"portfolio.stork-eel.ts.net", false, "", "portfolio.stork-eel.ts.net", "portfolio.stork-eel.ts.net", nil},
+		{"portfolio-1", false, "", "portfolio-1", "portfolio-1", nil},
 		{"elsewhere.example.com", false, "", "elsewhere.example.com", "elsewhere.example.com", nil},
 	}
 	for _, row := range rows {
@@ -141,10 +144,33 @@ func TestListUnionsBothSourcesWithoutSelfOrDuplicates(t *testing.T) {
 	for _, host := range output.Hosts {
 		got = append(got, host.Name+":"+host.Source)
 	}
-	want := []string{"arrakis:both", "huey:ssh-config", "lv426:tailnet", "portfolio:tailnet", "portfolio-1:tailnet", "urth:ssh-config", "vault:tailnet"}
+	want := []string{"arrakis:both", "huey:ssh-config", "lv426:tailnet", "urth:ssh-config", "vault:tailnet"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("hosts %v, want %v", got, want)
 	}
+}
+
+func TestConfiguredPeerWithoutTailscaleSSHRemainsAvailable(t *testing.T) {
+	t.Parallel()
+	path := writeConfig(t, map[string]string{"config": "Host portfolio\n  HostName portfolio.stork-eel.ts.net\n"})
+	resolver := Resolver{Tools: fakeTools(map[string]string{
+		"tailscale status --json": status,
+		"ssh -G portfolio":        "hostname portfolio.stork-eel.ts.net\nuser ops\n",
+	}), SSHConfig: path}
+	output, err := resolver.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, host := range output.Hosts {
+		if host.Name == "portfolio" {
+			resolved, known := resolver.Resolve(context.Background(), "portfolio")
+			if !known || resolved.Source != SourceBoth || host.Source != SourceBoth || host.Peer.TailscaleSSH {
+				t.Fatalf("configured OpenSSH peer: listed %+v, resolved %+v", host, resolved)
+			}
+			return
+		}
+	}
+	t.Fatal("configured OpenSSH peer was omitted")
 }
 
 func TestListWithoutTailscaleIsTheSSHConfig(t *testing.T) {

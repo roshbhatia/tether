@@ -73,11 +73,16 @@ inventory to be seen.
 ## Hosts and the tailnet
 
 `tether hosts` lists what `tsh` can name: the literal `Host` entries of
-`~/.ssh/config` (following `Include`) and the peers of the tailnet from
+`~/.ssh/config` (following `Include`) and SSH-enabled peers of the tailnet from
 `tailscale status --json`, each marked `ssh-config`, `tailnet`, or `both`.
 `--json` writes `tether.hosts/v1`; `--names` feeds the completions.
 
-Resolution order is the ssh config alias, then a tailnet peer by MagicDNS
+Tailnet discovery requires advertised `sshHostKeys`. Peers without keys are
+excluded from automatic discovery, including peers with an empty key list.
+Explicit SSH config entries remain available for ordinary OpenSSH servers.
+Offline SSH-enabled peers remain listed with their offline status.
+
+Resolution order is the ssh config alias, then an SSH-enabled tailnet peer by MagicDNS
 label, hostname, DNS name, or tailnet IP. A tailnet-only host is keyed by its
 MagicDNS label and reached by its DNS name, `user@name.ts.net` when the config
 sets `hosts.<name>.user`. The `transport:` reason records which it was.

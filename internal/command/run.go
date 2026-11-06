@@ -364,7 +364,7 @@ func transportFact(target hosts.Host) string {
 		}
 		return fact + ")"
 	default:
-		return "transport: ssh to " + target.Target + " (not in ssh config, not a tailnet peer)"
+		return "transport: ssh to " + target.Target + " (not in ssh config or advertised as a Tailscale SSH host)"
 	}
 }
 

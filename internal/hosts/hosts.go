@@ -84,20 +84,15 @@ func (resolver Resolver) userFor(host string) string {
 	return resolver.UserFor(host)
 }
 
-// Resolve names one host. The order is: a literal ssh config alias, then a
-// tailnet peer by MagicDNS label, hostname, DNS name, or IP. An unknown name
-// is returned as-is with known false; ssh may still resolve it.
+// Resolve prefers SSH config aliases, then SSH-enabled tailnet peers.
+// Unknown targets are returned unchanged for ordinary SSH resolution.
 func (resolver Resolver) Resolve(ctx context.Context, name string) (Host, bool) {
 	aliases, _ := SSHConfigHosts(resolver.sshConfig())
 	tailnet := probe.LoadTailnet(ctx, resolver.Tools)
-	return resolver.resolve(ctx, name, aliases, tailnet)
-}
-
-func (resolver Resolver) resolve(ctx context.Context, name string, aliases []string, tailnet probe.Tailnet) (Host, bool) {
 	if alias, ok := matchAlias(name, aliases); ok {
 		return resolver.fromAlias(ctx, alias, tailnet), true
 	}
-	if peer, ok := tailnet.Find(name); ok {
+	if peer, ok := tailnet.Find(name); ok && peer.TailscaleSSH {
 		return resolver.fromPeer(peer), true
 	}
 	host := Host{Name: name, Hostname: name, Target: withUser(resolver.userFor(name), name)}
@@ -112,7 +107,6 @@ func (resolver Resolver) fromAlias(ctx context.Context, alias string, tailnet pr
 	}
 	host.Target = withUser(resolver.userFor(alias), alias)
 	if peer, ok := tailnet.Find(alias, local.Hostname); ok {
-		peer := peer
 		host.Peer = &peer
 		host.Source = SourceBoth
 	}
@@ -142,8 +136,8 @@ func matchAlias(name string, aliases []string) (string, bool) {
 	return "", false
 }
 
-// List is the union of both sources, sorted by name. The local tailnet node
-// is not a candidate.
+// List combines SSH config hosts and SSH-enabled tailnet peers, sorted by name.
+// The local tailnet node is not a discovered candidate.
 func (resolver Resolver) List(ctx context.Context) (Output, error) {
 	path := resolver.sshConfig()
 	aliases, err := SSHConfigHosts(path)
@@ -161,6 +155,9 @@ func (resolver Resolver) List(ctx context.Context) (Output, error) {
 		}
 	}
 	for _, peer := range tailnet.Peers {
+		if !peer.TailscaleSSH {
+			continue
+		}
 		if _, ok := seen[peer.Name]; ok {
 			continue
 		}
