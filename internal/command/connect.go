@@ -12,6 +12,7 @@ import (
 	"github.com/roshbhatia/tether/internal/negotiation"
 	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
+	"github.com/roshbhatia/tether/internal/rank"
 )
 
 // RunTSH is the tsh entry point: `tsh <args>` is `tether connect <args>`
@@ -40,6 +41,20 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	if options.version {
 		fmt.Fprintln(streams.Stdout, streams.Version)
 		return 0
+	}
+	if err := (rank.Prefs{Mode: rank.Mode(options.mode), Pin: options.pin}).Validate(); err != nil {
+		if options.dryRun {
+			subject := plan.Subject{Host: options.host, Session: options.session}
+			if options.user != "" {
+				subject.Target = options.user + "@" + options.host
+			}
+			if code := writeJSON(streams, plan.Failure(subject, err, rank.Result{}, plan.Probe{Stale: true})); code != 0 {
+				return code
+			}
+		} else {
+			fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
+		}
+		return 2
 	}
 	settings, err := config.Load()
 	if err != nil {
@@ -74,11 +89,10 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	if !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
 		say("probing %s", target.Name)
 		refreshed, err := coordinator.Refresh(ctx, facts, false)
+		facts = refreshed
+		record, cached = facts.Record, facts.Cached
 		if err != nil {
-			say("probe failed: %v", err)
-		} else {
-			facts = refreshed
-			record, cached = facts.Record, facts.Cached
+			say("could not save probe cache: %v", err)
 		}
 	}
 
@@ -94,10 +108,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		NativeUnfit: flags.nativeUnfit,
 	}
 	output, err := negotiation.Evaluate(settings, facts, req)
-	if err != nil && !negotiation.IsRankError(err) {
-		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
-		return 1
-	}
+
 	if options.dryRun {
 		if code := writeJSON(streams, output); code != 0 {
 			return code

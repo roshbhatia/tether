@@ -1,7 +1,6 @@
 package negotiation
 
 import (
-	"errors"
 	"strings"
 	"time"
 
@@ -23,18 +22,6 @@ type Request struct {
 	Flags       plan.Flags
 	MoshUnfit   string
 	NativeUnfit string
-}
-
-// RankError marks a ranking failure, such as an unavailable pin, whose plan
-// document still renders. Other errors are I/O.
-type RankError struct{ err error }
-
-func (err RankError) Error() string { return err.err.Error() }
-func (err RankError) Unwrap() error { return err.err }
-
-func IsRankError(err error) bool {
-	var target RankError
-	return errors.As(err, &target)
 }
 
 // Evaluate renders a plan from observed facts without I/O.
@@ -103,7 +90,7 @@ func Evaluate(settings config.Config, observed Facts, req Request) (plan.Output,
 		subject.Target = target.Target
 	}
 	if err != nil {
-		return plan.Failure(subject, err, result, probeInfo), RankError{err}
+		return plan.Failure(subject, err, result, probeInfo), err
 	}
 	return plan.Build(subject, req.Inner, plan.Refs{Native: req.Native, NativeRaw: req.NativeRaw}, result, probeInfo), nil
 }

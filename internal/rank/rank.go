@@ -139,6 +139,19 @@ type Prefs struct {
 	FlakyLoss  float64
 }
 
+// Validate checks preference names without requiring observed capabilities.
+func (prefs Prefs) Validate() error {
+	if prefs.Mode != "" && !prefs.Mode.Valid() {
+		return fmt.Errorf("mode %q is not one of %s", prefs.Mode, strings.Join(ModeNames(), ", "))
+	}
+	if prefs.Pin != "" {
+		if _, ok := TierNamed(prefs.Pin); !ok {
+			return fmt.Errorf("pin %q is not a tier", prefs.Pin)
+		}
+	}
+	return nil
+}
+
 // Filtered is a tier that a hard requirement removed.
 type Filtered struct {
 	Tier   Tier
@@ -176,13 +189,8 @@ func Rank(caps Caps, link Link, prefs Prefs) (Result, error) {
 	if prefs.Mode == "" {
 		prefs.Mode = ModeAuto
 	}
-	if !prefs.Mode.Valid() {
-		return Result{}, fmt.Errorf("mode %q is not one of %s", prefs.Mode, strings.Join(ModeNames(), ", "))
-	}
-	if prefs.Pin != "" {
-		if _, ok := TierNamed(prefs.Pin); !ok {
-			return Result{}, fmt.Errorf("pin %q is not a tier", prefs.Pin)
-		}
+	if err := prefs.Validate(); err != nil {
+		return Result{}, err
 	}
 
 	result := Result{}

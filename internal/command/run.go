@@ -19,6 +19,7 @@ import (
 	"github.com/roshbhatia/tether/internal/config"
 	"github.com/roshbhatia/tether/internal/hosts"
 	"github.com/roshbhatia/tether/internal/negotiation"
+	"github.com/roshbhatia/tether/internal/plan"
 	"github.com/roshbhatia/tether/internal/probe"
 	"github.com/roshbhatia/tether/internal/rank"
 )
@@ -232,6 +233,13 @@ func runPlan(args []string, streams Streams) int {
 		fmt.Fprintln(streams.Stderr, "tether plan: --host is required")
 		return 2
 	}
+	if err := (rank.Prefs{Mode: rank.Mode(*mode), Pin: *pin}).Validate(); err != nil {
+		output := plan.Failure(plan.Subject{Host: *host, Session: *session}, err, rank.Result{}, plan.Probe{Stale: true})
+		if code := writeJSON(streams, output); code != 0 {
+			return code
+		}
+		return 1
+	}
 	settings, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(streams.Stderr, "tether plan: %v\n", err)
@@ -246,10 +254,7 @@ func runPlan(args []string, streams Streams) int {
 	output, err := negotiation.Evaluate(settings, facts, negotiation.Request{
 		Session: *session, Native: *native, NativeRaw: *nativeRaw, Mode: *mode, Pin: *pin, Inner: flags.Args(),
 	})
-	if err != nil && !negotiation.IsRankError(err) {
-		fmt.Fprintf(streams.Stderr, "tether plan: %v\n", err)
-		return 1
-	}
+
 	if code := writeJSON(streams, output); code != 0 {
 		return code
 	}

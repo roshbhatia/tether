@@ -61,14 +61,14 @@ func Load() (Config, error) {
 	return loaded, loaded.Validate()
 }
 
-// Validate rejects an unknown mode.
+// Validate rejects unknown modes and pins.
 func (config Config) Validate() error {
 	if !config.Mode.Valid() {
 		return fmt.Errorf("mode %q is not one of %s", config.Mode, strings.Join(rank.ModeNames(), ", "))
 	}
 	for name, host := range config.Hosts {
-		if host.Mode != "" && !host.Mode.Valid() {
-			return fmt.Errorf("hosts.%s.mode %q is not one of %s", name, host.Mode, strings.Join(rank.ModeNames(), ", "))
+		if err := (rank.Prefs{Mode: host.Mode, Pin: host.Pin}).Validate(); err != nil {
+			return fmt.Errorf("hosts.%s.%w", name, err)
 		}
 	}
 	return nil
