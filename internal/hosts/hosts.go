@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -206,15 +207,17 @@ func collectHosts(path string, seen map[string]struct{}, hosts *[]string, depth 
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
+	line := 0
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 2 || strings.HasPrefix(fields[0], "#") {
-			continue
+		line++
+		key, values, err := discoveryDirective(scanner.Text())
+		if err != nil {
+			return fmt.Errorf("%s:%d: %w", path, line, err)
 		}
-		switch strings.ToLower(fields[0]) {
+		switch key {
 		case "host":
-			for _, name := range fields[1:] {
-				if strings.ContainsAny(name, "*?!") {
+			for _, name := range values {
+				if name == "" || strings.ContainsAny(name, "*?!") {
 					continue
 				}
 				if _, ok := seen[name]; ok {
@@ -224,7 +227,7 @@ func collectHosts(path string, seen map[string]struct{}, hosts *[]string, depth 
 				*hosts = append(*hosts, name)
 			}
 		case "include":
-			for _, pattern := range fields[1:] {
+			for _, pattern := range values {
 				for _, included := range includeFiles(path, pattern) {
 					if err := collectHosts(included, seen, hosts, depth+1); err != nil {
 						return err
@@ -234,6 +237,55 @@ func collectHosts(path string, seen map[string]struct{}, hosts *[]string, depth 
 		}
 	}
 	return scanner.Err()
+}
+
+// discoveryDirective tokenizes only the directives used for host discovery.
+// OpenSSH still owns effective options through ssh -G. Syntax reference:
+// https://man.openbsd.org/ssh_config
+func discoveryDirective(line string) (string, []string, error) {
+	line = strings.TrimSpace(line)
+	end := strings.IndexAny(line, " \t=")
+	if end < 0 {
+		return "", nil, nil
+	}
+	key := strings.ToLower(line[:end])
+	if key != "host" && key != "include" {
+		return "", nil, nil
+	}
+	values := strings.TrimSpace(line[end:])
+	values = strings.TrimPrefix(values, "=")
+	var args []string
+	for len(values) > 0 {
+		values = strings.TrimLeft(values, " \t")
+		if values == "" || values[0] == '#' {
+			break
+		}
+		var token strings.Builder
+		var quote byte
+		i := 0
+		for ; i < len(values); i++ {
+			c := values[i]
+			if c == '\\' && i+1 < len(values) &&
+				(strings.ContainsRune("\\\"'", rune(values[i+1])) || (quote == 0 && values[i+1] == ' ')) {
+				i++
+				token.WriteByte(values[i])
+			} else if quote == 0 && (c == ' ' || c == '\t') {
+				break
+			} else if quote == 0 && (c == '"' || c == '\'') {
+				quote = c
+			} else if quote != 0 && c == quote {
+				quote = 0
+			} else {
+				token.WriteByte(c)
+			}
+		}
+		if quote != 0 {
+			return "", nil, errors.New("unterminated quote in " + key + " directive")
+		}
+		args = append(args, token.String())
+		values = values[i:]
+	}
+	return key, args, nil
 }
 
 func includeFiles(config, pattern string) []string {

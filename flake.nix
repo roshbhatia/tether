@@ -54,6 +54,7 @@
             ];
             nativeBuildInputs = [ pkgs.installShellFiles ];
             nativeCheckInputs = [
+              pkgs.openssh
               pkgs.bash
               pkgs.fish
               pkgs.nushell
@@ -155,6 +156,7 @@
         {
           default = pkgs.mkShellNoCC {
             packages = [
+              pkgs.openssh
               pkgs.uv
               pkgs.python3
               pkgs.git

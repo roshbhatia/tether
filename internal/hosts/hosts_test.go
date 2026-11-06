@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -193,3 +194,56 @@ func TestListWithoutTailscaleIsTheSSHConfig(t *testing.T) {
 }
 
 func ptr(value bool) *bool { return &value }
+
+func TestSSHConfigDiscoveryMatchesOpenSSHSyntax(t *testing.T) {
+	t.Parallel()
+	ssh, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("OpenSSH is unavailable")
+	}
+	path := writeConfig(t, map[string]string{
+		"config":         "Include = \"conf dir/hosts\" # included aliases\nHost server # production\n HostName 127.0.0.1\nHost \"quoted\"\n HostName 127.0.0.2\nHost=equals\n HostName 127.0.0.3\n",
+		"conf dir/hosts": "Host included\n HostName 127.0.0.4\n",
+	})
+	// Absolute Include paths also keep the fixture independent of ~/.ssh.
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content = []byte(strings.ReplaceAll(string(content), "conf dir/hosts", filepath.Join(filepath.Dir(path), "conf dir/hosts")))
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := SSHConfigHosts(path)
+	want := []string{"included", "server", "quoted", "equals"}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("hosts=%q want=%q error=%v", got, want, err)
+	}
+	for i, name := range want {
+		out, err := exec.Command(ssh, "-F", path, "-G", name).Output()
+		hostname := []string{"127.0.0.4", "127.0.0.1", "127.0.0.2", "127.0.0.3"}[i]
+		if err != nil || !strings.Contains(string(out), "hostname "+hostname+"\n") {
+			t.Fatalf("OpenSSH %s: %s %v", name, out, err)
+		}
+	}
+}
+
+func TestSSHConfigDiscoveryPreservesQuotedValues(t *testing.T) {
+	t.Parallel()
+	path := writeConfig(t, map[string]string{
+		"config":         "Host \"literal#alias\" other=alias # ignored\nInclude \"conf dir/hosts\"\n",
+		"conf dir/hosts": "Host included\n",
+	})
+	got, err := SSHConfigHosts(path)
+	if want := []string{"literal#alias", "other=alias", "included"}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("hosts=%q want=%q error=%v", got, want, err)
+	}
+}
+
+func TestSSHConfigDiscoveryRejectsUnterminatedQuotes(t *testing.T) {
+	t.Parallel()
+	path := writeConfig(t, map[string]string{"config": "# comment\nHost \"unfinished\n"})
+	if _, err := SSHConfigHosts(path); err == nil || !strings.Contains(err.Error(), path+":2:") {
+		t.Fatalf("error=%v", err)
+	}
+}
