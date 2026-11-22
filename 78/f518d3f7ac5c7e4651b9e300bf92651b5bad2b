@@ -1,0 +1,41 @@
+README.md
+  s_a4a3eea4720821::t_5083ca50ebe343 237,273
+completions/_tether
+  s_a4a3eea4720821::t_b9231026567e2f 132
+completions/_tsh
+  s_a4a3eea4720821::t_55b841eac43d75 61
+completions/tether.fish
+  s_a4a3eea4720821::t_bbad00da63370d 180
+completions/tether.nu
+  s_a4a3eea4720821::t_5b8f88ceb5c58d 20
+completions/tsh.fish
+  s_a4a3eea4720821::t_275eecd3335d0e 77
+completions/tsh.nu
+  s_a4a3eea4720821::t_9382c62a8fa902 2
+internal/command/boundaries_test.go
+  s_a4a3eea4720821::t_baaf0cb53bdcef 43,51-52
+internal/command/connect.go
+  s_a4a3eea4720821::t_e9ef33e461d809 115
+internal/command/connect_test.go
+  s_a4a3eea4720821::t_4acb8efabc4654 151-154,175,244-246
+internal/command/observations_test.go
+  s_a4a3eea4720821::t_8cf0405f082d09 20,94,96,100,104-105,107-108,141,146,157-158,163-184
+internal/command/tsh.go
+  s_a4a3eea4720821::t_fe97d2fe1a0f1a 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "78f518d3f7ac5c7e4651b9e300bf92651b5bad2b",
+  "prompts": {},
+  "sessions": {
+    "s_a4a3eea4720821": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f4ef-68fa-7c11-b609-3f16bf1d9bf7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Roshan Bhatia <rshnbhatia@gmail.com>"
+    }
+  }
+}
