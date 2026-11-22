@@ -86,7 +86,7 @@ _tsh_complete() {
   case "$context" in
     '')
       __tsh_completion_filter "$current" < <(
-        printf '%s\n' 'completion' '--dry-run' '--help' '-h' '--login' '-l' '--mode' '--no-probe' '--pin' '--port' '-p' '--quiet' '-q' '--session' '-s' '--version'
+        printf '%s\n' 'completion' '--dry-run' '--foreground' '--help' '-h' '--login' '-l' '--mode' '--no-probe' '--pin' '--port' '-p' '--quiet' '-q' '--session' '-s' '--version'
         __tsh_completion_values_2
       )
       ;;

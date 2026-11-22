@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/roshbhatia/tether/internal/hosts"
 	"github.com/roshbhatia/tether/internal/probe"
 )
 
@@ -63,4 +64,13 @@ func unreachable(reason string) bool {
 		}
 	}
 	return false
+}
+
+// NativeRef maps a configured SSH alias to a caller's registered domain.
+func NativeRef(facts Facts, prefix string) string {
+	host := facts.Resolution.Host
+	if host.Source == hosts.SourceSSHConfig || host.Source == hosts.SourceBoth {
+		return prefix + strings.ToLower(host.Name)
+	}
+	return ""
 }

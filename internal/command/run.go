@@ -33,7 +33,7 @@ var modeNames = rank.ModeNames()
 var specification = completion.Command{
 	Name:            "tether",
 	Description:     "Pick the hop that carries a remote session",
-	Synopsis:        "tether [--version] <connect|plan|probe|hosts|status|completion>",
+	Synopsis:        "tether [--version] <connect|attach|session|plan|probe|hosts|status|completion>",
 	LongDescription: "The plumbing behind tsh. Resolve which transport carries a command to a host, from what both ends have installed. connect execs the hop; plan, probe, hosts --json, and status write JSON.",
 	Flags: []completion.Flag{
 		{Name: "version", Description: "Write the version to stdout"},
@@ -44,9 +44,24 @@ var specification = completion.Command{
 			Name:              "connect",
 			Description:       "The plumbing behind tsh: negotiate the hop and exec it",
 			Synopsis:          "tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]",
-			LongDescription:   "Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. The terminal environment does not change this behavior.",
+			LongDescription:   "Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Interactive login from a live WezTerm pane can attach its native domain.",
 			CompletionCommand: []string{"tether", "hosts", "--names"},
 			Flags:             tshSpecification.Flags,
+		},
+		{
+			Name:        "attach",
+			Description: "Attach a native WezTerm mux domain",
+			Synopsis:    "tether attach [--dry-run] [--no-probe] <host>",
+			Flags: []completion.Flag{
+				{Name: "dry-run", Description: "Print the cached attachment plan"},
+				{Name: "no-probe", Description: "Use cached capability data"},
+				{Name: "help", Short: "h", Description: "Print command help"},
+			},
+		},
+		{
+			Name:        "session",
+			Description: "List or attach remote WezTerm named sessions",
+			Synopsis:    "tether session list <host> | tether session attach <host> <name>",
 		},
 		{
 			Name:            "plan",
@@ -119,6 +134,8 @@ type Streams struct {
 	Exec func(path string, argv []string, env []string) error
 	// Getenv defaults to os.Getenv.
 	Getenv func(key string) string
+	// Interactive overrides terminal detection in tests.
+	Interactive func() bool
 	// SSHConfig defaults to ~/.ssh/config.
 	SSHConfig string
 }
@@ -168,6 +185,10 @@ func Run(args []string, streams Streams) int {
 		switch args[0] {
 		case "connect":
 			return runConnect(args[1:], streams)
+		case "attach":
+			return connect("tether attach", args[1:], streams, subcommand("attach"), true)
+		case "session":
+			return runSession(args[1:], streams)
 		case "plan":
 			return runPlan(args[1:], streams)
 		case "probe":
@@ -270,7 +291,7 @@ func runPlan(args []string, streams Streams) int {
 		return 1
 	}
 	if *native == "" && *prefix != "" && (facts.Resolution.Host.Source == hosts.SourceSSHConfig || facts.Resolution.Host.Source == hosts.SourceBoth) {
-		*native = *prefix + strings.ToLower(facts.Resolution.Host.Name)
+		*native = negotiation.NativeRef(facts, *prefix)
 	}
 	output, err := negotiation.Evaluate(settings, facts, negotiation.Request{
 		Host: *host, Session: *session, Native: *native, NativeRaw: *nativeRaw, Mode: *mode, Pin: *pin, Inner: flags.Args(),

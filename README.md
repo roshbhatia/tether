@@ -2,7 +2,9 @@
 
 `tsh` is `ssh` with the hop negotiated. Type `tsh arrakis` where you typed
 `ssh arrakis` or `mosh arrakis`: it lands in a login shell over mosh when both
-ends have it, over plain ssh otherwise. The command stays in the foreground.
+ends have it, over plain ssh otherwise. Interactive login in a live WezTerm pane prefers native attachment. Use
+`--foreground` for an inline connection. Remote commands and SSH options stay
+in the foreground.
 One stderr line says which hop won.
 
 ```bash
@@ -52,9 +54,14 @@ back.
 
 - A `local` hop (`mosh-mux`, `ssh`) execs the plan command. The process is
   replaced and the exit status is the hop's.
-- `connect` never launches a terminal tab. A GUI can consume `tether plan --native <domain>` and launch the returned plan.
+- Bare interactive `tsh` inside WezTerm can attach via the terminal client.
+  `tether attach HOST` explicitly opens the native domain from any terminal.
+  Both reuse address selection from the picker.
+- `tether session list HOST` and `tether session attach HOST NAME` run the
+  remote `wezterm-remote` provider in the foreground. The provider owns named
+  sessions and their persistence.
 - With no command the far side gets its login shell, exactly like `ssh`. With
-  `-s S` it gets `zmx attach S` when the probe saw `zmx` on the remote, else
+  `-s S` it gets `wezterm-remote attach S` when available, else `zmx attach S`, else
   `tmux new -A -s S` when it saw `tmux`, else the login shell and a stderr
   note. The mux is read from the host record, never assumed.
 
@@ -215,19 +222,20 @@ Run `python3 hack/extra-demos.py` from that shell to record the extras.
 
 ### `tsh`
 
-tsh [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]
+tsh [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [--foreground] [user@]<host> [-- <command>]
 
 A drop-in for `ssh host` and `mosh host`: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and exec the winner. ssh options ride the ssh tier verbatim and the mosh tier through --ssh; one that mosh cannot carry (a port forward) filters mosh out with the reason.
 
 | Option | Description |
 | --- | --- |
-| `--session`, `-s` `<value>` | Attach this remote mux session (zmx, else tmux) instead of a login shell |
+| `--session`, `-s` `<value>` | Attach this remote session (wezterm-remote, zmx, or tmux) instead of a login shell |
 | `--quiet`, `-q` | Do not announce the winning hop on stderr |
 | `--login`, `-l` `<value>` | Remote user, as ssh -l |
 | `--port`, `-p` `<value>` | Remote port, as ssh -p |
 | `--mode` `<value>` | Ordering mode; overrides the config |
 | `--pin` `<value>` | Tier that must win; overrides the config |
 | `--dry-run` | Write the tether.plan/v1 document and exit without connecting |
+| `--foreground` | Keep the connection in this terminal |
 | `--no-probe` | Never run the ssh round trip; plan from the cache only |
 | `--version` | Write the version to stdout |
 | `--help`, `-h` | Print command help |
@@ -239,7 +247,7 @@ A drop-in for `ssh host` and `mosh host`: resolve the host (ssh config alias, th
 
 ### `tether`
 
-tether [--version] <connect|plan|probe|hosts|status|completion>
+tether [--version] <connect|attach|session|plan|probe|hosts|status|completion>
 
 The plumbing behind tsh. Resolve which transport carries a command to a host, from what both ends have installed. connect execs the hop; plan, probe, hosts --json, and status write JSON.
 
@@ -252,20 +260,35 @@ The plumbing behind tsh. Resolve which transport carries a command to a host, fr
 
 tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]
 
-Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. The terminal environment does not change this behavior.
+Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and replace this process with the winning local hop. Interactive login from a live WezTerm pane can attach its native domain.
 
 | Option | Description |
 | --- | --- |
-| `--session`, `-s` `<value>` | Attach this remote mux session (zmx, else tmux) instead of a login shell |
+| `--session`, `-s` `<value>` | Attach this remote session (wezterm-remote, zmx, or tmux) instead of a login shell |
 | `--quiet`, `-q` | Do not announce the winning hop on stderr |
 | `--login`, `-l` `<value>` | Remote user, as ssh -l |
 | `--port`, `-p` `<value>` | Remote port, as ssh -p |
 | `--mode` `<value>` | Ordering mode; overrides the config |
 | `--pin` `<value>` | Tier that must win; overrides the config |
 | `--dry-run` | Write the tether.plan/v1 document and exit without connecting |
+| `--foreground` | Keep the connection in this terminal |
 | `--no-probe` | Never run the ssh round trip; plan from the cache only |
 | `--version` | Write the version to stdout |
 | `--help`, `-h` | Print command help |
+
+### `tether attach`
+
+tether attach [--dry-run] [--no-probe] <host>
+
+| Option | Description |
+| --- | --- |
+| `--dry-run` | Print the cached attachment plan |
+| `--no-probe` | Use cached capability data |
+| `--help`, `-h` | Print command help |
+
+### `tether session`
+
+tether session list <host> | tether session attach <host> <name>
 
 ### `tether plan`
 

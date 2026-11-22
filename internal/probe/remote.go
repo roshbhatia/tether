@@ -13,11 +13,11 @@ import (
 )
 
 // remoteTools are the far-side programs the tiers depend on.
-var remoteTools = []string{"mosh-server", "zmx", "tmux", "wezterm-mux-server"}
+var remoteTools = []string{"mosh-server", "zmx", "tmux", "wezterm-mux-server", "wezterm-remote"}
 
 // remoteScript runs under sh so the remote login shell does not matter
 // (a nushell login shell has no `command -v`). One line, no single quotes.
-const remoteScript = `printf "home:=%s\n" "$HOME"; for t in mosh-server zmx tmux wezterm-mux-server; do p=$(command -v "$t" 2>/dev/null) || continue; printf "path:%s=%s\n" "$t" "$p"; case $t in tmux) v=$(tmux -V 2>&1 | head -n 1);; *) v=$("$t" --version 2>&1 | head -n 1);; esac; printf "version:%s=%s\n" "$t" "$v"; done; exit 0`
+const remoteScript = `printf "home:=%s\n" "$HOME"; for t in mosh-server zmx tmux wezterm-mux-server wezterm-remote; do p=$(command -v "$t" 2>/dev/null) || continue; printf "path:%s=%s\n" "$t" "$p"; case $t in tmux) v=$(tmux -V 2>&1 | head -n 1);; *) v=$("$t" --version 2>&1 | head -n 1);; esac; printf "version:%s=%s\n" "$t" "$v"; done; exit 0`
 
 // RemoteScript is the exact remote command line, exposed for tests and docs.
 func RemoteScript() string {
@@ -108,6 +108,8 @@ func parseRemoteInventory(out []byte, remote *Remote) {
 				remote.Tmux = value
 			case "wezterm-mux-server":
 				remote.WeztermMuxServer = value
+			case "wezterm-remote":
+				remote.WeztermRemote = value
 			}
 		case "version":
 			// Some tools pad with tabs; keep one space between fields.

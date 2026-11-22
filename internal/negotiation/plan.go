@@ -68,6 +68,7 @@ func Evaluate(settings config.Config, observed Facts, req Request) (plan.Output,
 		caps.RemoteReason = record.Remote.Reason
 		caps.RemoteMoshServer = record.Remote.MoshServer != ""
 		caps.RemoteZmx = record.Remote.Zmx != ""
+		caps.RemoteWeztermRemote = record.Remote.WeztermRemote != ""
 		caps.RemoteTmux = record.Remote.Tmux != ""
 		caps.RemoteMuxServer = record.Remote.WeztermMuxServer != ""
 		at := record.At

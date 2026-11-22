@@ -58,7 +58,7 @@ func TestConnectUsesFreshFactsWhenCacheCannotBeSaved(t *testing.T) {
 			if output.Probe.At == nil || !output.Probe.At.Equal(epoch.Add(probe.HostTTL+time.Minute)) {
 				t.Fatalf("not fresh: %+v", output.Probe)
 			}
-			if warm && !strings.Contains(stderr, "neither zmx nor tmux") {
+			if warm && !strings.Contains(stderr, "no supported session provider") {
 				t.Fatalf("old session command survived: %s", stderr)
 			}
 			if code, _, stderr := runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Minute)), "probe", "--host", "arrakis"); code != 1 || !strings.Contains(stderr, "create temp host record") {

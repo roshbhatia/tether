@@ -11,17 +11,29 @@ export extern "tether completion" [
 def "nu-complete tether shell" [] { [bash zsh fish nu] }
 
 export extern "tether connect" [
-  --session(-s): string # Attach this remote mux session (zmx, else tmux) instead of a login shell
+  --session(-s): string # Attach this remote session (wezterm-remote, zmx, or tmux) instead of a login shell
   --quiet(-q) # Do not announce the winning hop on stderr
   --login(-l): string # Remote user, as ssh -l
   --port(-p): string # Remote port, as ssh -p
   --mode: string@"__tether_completion_values_1" # Ordering mode; overrides the config
   --pin: string@"__tether_completion_values_2" # Tier that must win; overrides the config
   --dry-run # Write the tether.plan/v1 document and exit without connecting
+  --foreground # Keep the connection in this terminal
   --no-probe # Never run the ssh round trip; plan from the cache only
   --version # Write the version to stdout
   --help(-h) # Print command help
   ...args: string@"__tether_completion_values_0"
+]
+
+export extern "tether attach" [
+  --dry-run # Print the cached attachment plan
+  --no-probe # Use cached capability data
+  --help(-h) # Print command help
+  ...args: string@"__tether_completion_none"
+]
+
+export extern "tether session" [
+  ...args: string@"__tether_completion_none"
 ]
 
 export extern "tether plan" [

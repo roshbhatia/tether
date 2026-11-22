@@ -137,6 +137,9 @@
         "wezterm_mux_server": {
           "type": "string"
         },
+        "wezterm_remote": {
+          "type": "string"
+        },
         "home": {
           "type": "string",
           "description": "The remote $HOME; a native hop starts there"

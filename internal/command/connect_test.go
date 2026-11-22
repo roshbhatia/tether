@@ -54,7 +54,7 @@ func TestDefaultInnerPerRemoteMux(t *testing.T) {
 		{"no session is a login shell", nil, "", probe.Remote{Zmx: "/bin/zmx"}, true, nil, ""},
 		{"zmx first", nil, "s", probe.Remote{Zmx: "/bin/zmx", Tmux: "/bin/tmux"}, true, []string{"zmx", "attach", "s"}, ""},
 		{"tmux second", nil, "s", probe.Remote{Tmux: "/bin/tmux"}, true, []string{"tmux", "new", "-A", "-s", "s"}, ""},
-		{"no mux", nil, "s", probe.Remote{}, true, nil, "neither zmx nor tmux on h; opening a login shell instead of session s"},
+		{"no mux", nil, "s", probe.Remote{}, true, nil, "no supported session provider on h; opening a login shell instead of session s"},
 		{"no record", nil, "s", probe.Remote{}, false, nil, "no host record for h; opening a login shell instead of session s"},
 	}
 	for _, row := range rows {
@@ -134,7 +134,7 @@ func TestConnectSessionIsOptIn(t *testing.T) {
 	f.runs["ssh -o BatchMode=yes"] = "path:mosh-server=/bin/mosh-server\n"
 	f.execs = nil
 	code, _, stderr = runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Second)), "connect", "--session", "other", "arrakis")
-	if code != 0 || !strings.Contains(stderr, "neither zmx nor tmux on arrakis; opening a login shell instead of session other") {
+	if code != 0 || !strings.Contains(stderr, "no supported session provider on arrakis; opening a login shell instead of session other") {
 		t.Fatalf("exit %d stderr %q", code, stderr)
 	}
 	// mosh-mux needs a remote mux, so ssh carries the login shell.

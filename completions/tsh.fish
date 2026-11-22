@@ -75,6 +75,7 @@ function __tsh_completion_context
   echo $context
 end
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l dry-run -d 'Write the tether.plan/v1 document and exit without connecting'
+complete -c tsh -n 'test (__tsh_completion_context) = ""' -l foreground -d 'Keep the connection in this terminal'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l help -s h -d 'Print command help'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l login -s l -r -d 'Remote user, as ssh -l'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -f -l mode -r -a '(__tsh_completion_values_0)' -d 'Ordering mode; overrides the config'
@@ -82,7 +83,7 @@ complete -c tsh -n 'test (__tsh_completion_context) = ""' -l no-probe -d 'Never 
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -f -l pin -r -a '(__tsh_completion_values_1)' -d 'Tier that must win; overrides the config'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l port -s p -r -d 'Remote port, as ssh -p'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l quiet -s q -d 'Do not announce the winning hop on stderr'
-complete -c tsh -n 'test (__tsh_completion_context) = ""' -l session -s s -r -d 'Attach this remote mux session (zmx, else tmux) instead of a login shell'
+complete -c tsh -n 'test (__tsh_completion_context) = ""' -l session -s s -r -d 'Attach this remote session (wezterm-remote, zmx, or tmux) instead of a login shell'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l version -d 'Write the version to stdout'
 complete -c tsh -f -n 'test (__tsh_completion_context) = ""' -a completion -d 'Generate shell completions'
 complete -c tsh -f -n 'test (__tsh_completion_context) = ""' -a '(__tsh_completion_values_2)'

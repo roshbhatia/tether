@@ -100,12 +100,13 @@ type Caps struct {
 	// RemoteKnown is false when no remote probe has run for this host.
 	RemoteKnown bool
 	// RemoteOK is the round trip result; false with RemoteKnown means offline.
-	RemoteOK         bool
-	RemoteReason     string
-	RemoteMoshServer bool
-	RemoteZmx        bool
-	RemoteTmux       bool
-	RemoteMuxServer  bool
+	RemoteOK            bool
+	RemoteReason        string
+	RemoteMoshServer    bool
+	RemoteZmx           bool
+	RemoteWeztermRemote bool
+	RemoteTmux          bool
+	RemoteMuxServer     bool
 
 	// RegistryOffline is the node registry saying the peer is down.
 	RegistryOffline bool
@@ -278,8 +279,8 @@ func unavailable(tier Tier, caps Caps, offline bool) string {
 			if !caps.RemoteMoshServer {
 				missing = append(missing, "remote mosh-server absent")
 			}
-			if !caps.RemoteZmx && !caps.RemoteTmux {
-				missing = append(missing, "remote zmx and tmux absent")
+			if !caps.RemoteZmx && !caps.RemoteTmux && !caps.RemoteWeztermRemote {
+				missing = append(missing, "remote wezterm-remote, zmx, and tmux absent")
 			}
 		}
 	case SSHRaw:

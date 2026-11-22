@@ -106,6 +106,8 @@ _tether_complete() {
     case "$context:$word" in
       ':completion') context='completion' ;;
       ':connect') context='connect' ;;
+      ':attach') context='attach' ;;
+      ':session') context='session' ;;
       ':plan') context='plan' ;;
       ':probe') context='probe' ;;
       ':hosts') context='hosts' ;;
@@ -134,7 +136,7 @@ _tether_complete() {
   case "$context" in
     '')
       __tether_completion_filter "$current" < <(
-        printf '%s\n' 'completion' 'connect' 'plan' 'probe' 'hosts' 'status' 'completion' '--help' '-h' '--version'
+        printf '%s\n' 'completion' 'connect' 'attach' 'session' 'plan' 'probe' 'hosts' 'status' 'completion' '--help' '-h' '--version'
       )
       ;;
     'completion')
@@ -144,8 +146,17 @@ _tether_complete() {
       ;;
     'connect')
       __tether_completion_filter "$current" < <(
-        printf '%s\n' '--session' '-s' '--quiet' '-q' '--login' '-l' '--port' '-p' '--mode' '--pin' '--dry-run' '--no-probe' '--version' '--help' '-h'
+        printf '%s\n' '--session' '-s' '--quiet' '-q' '--login' '-l' '--port' '-p' '--mode' '--pin' '--dry-run' '--foreground' '--no-probe' '--version' '--help' '-h'
         __tether_completion_values_0
+      )
+      ;;
+    'attach')
+      __tether_completion_filter "$current" < <(
+        printf '%s\n' '--dry-run' '--no-probe' '--help' '-h'
+      )
+      ;;
+    'session')
+      __tether_completion_filter "$current" < <(
       )
       ;;
     'plan')

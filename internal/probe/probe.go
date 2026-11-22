@@ -41,6 +41,7 @@ type Remote struct {
 	Zmx              string            `json:"zmx"`
 	Tmux             string            `json:"tmux"`
 	WeztermMuxServer string            `json:"wezterm_mux_server"`
+	WeztermRemote    string            `json:"wezterm_remote,omitempty"`
 	Home             string            `json:"home,omitempty" jsonschema:"description=The remote $HOME; a native hop starts there"`
 	Versions         map[string]string `json:"versions"`
 	At               time.Time         `json:"at" jsonschema:"description=When this remote layer last ran (success or failure)"`

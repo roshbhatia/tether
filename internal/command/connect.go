@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/roshbhatia/go-utils/completion"
 	"github.com/roshbhatia/tether/internal/config"
@@ -18,16 +19,16 @@ import (
 // RunTSH is the tsh entry point: `tsh <args>` is `tether connect <args>`
 // announcing itself as tsh.
 func RunTSH(args []string, streams Streams) int {
-	return connect("tsh", args, streams, tshSpecification)
+	return connect("tsh", args, streams, tshSpecification, false)
 }
 
 func runConnect(args []string, streams Streams) int {
-	return connect("tether connect", args, streams, subcommand("connect"))
+	return connect("tether connect", args, streams, subcommand("connect"), false)
 }
 
 // connect parses an ssh-shaped argv, resolves and probes the host, ranks the
 // tiers, and realizes the winner. prog prefixes every diagnostic.
-func connect(prog string, args []string, streams Streams, spec completion.Command) int {
+func connect(prog string, args []string, streams Streams, spec completion.Command, attach bool) int {
 	options, err := parseTSH(args)
 	if err != nil {
 		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
@@ -41,6 +42,13 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	if options.version {
 		fmt.Fprintln(streams.Stdout, streams.Version)
 		return 0
+	}
+	if attach {
+		if !options.nativeShape() {
+			fmt.Fprintf(streams.Stderr, "%s: expected a host alias for native attachment\n", prog)
+			return 2
+		}
+		options.mode, options.pin = string(rank.ModeNative), rank.NativeMux
 	}
 	if err := (rank.Prefs{Mode: rank.Mode(options.mode), Pin: options.pin}).Validate(); err != nil {
 		if options.dryRun {
@@ -72,11 +80,21 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 
 	coordinator := streams.coordinator(settings)
 	addresses := settings.AddressesFor(options.host)
-	routed := len(addresses) > 1 && !options.noProbe && !options.dryRun && len(options.options) == 0
+	mode := rank.Mode(options.mode)
+	if mode == "" {
+		mode = settings.ModeFor(options.host)
+	}
+	native := attach || (options.nativeShape() && mode != rank.ModeRoam && streams.liveWezTerm(ctx, tools))
+	if native && mode == rank.ModeAuto {
+		options.mode = string(rank.ModeNative)
+	}
+	routed := (len(addresses) > 1 || native) && !options.noProbe && !options.dryRun && len(options.options) == 0
 	var facts negotiation.Facts
 	var observeErr error
 	if routed {
-		facts, observeErr = coordinator.Resolve(ctx, addresses, options.user)
+		routeCtx, cancel := context.WithTimeout(ctx, 13*time.Second)
+		facts, observeErr = coordinator.Resolve(routeCtx, addresses, options.user)
+		cancel()
 	} else {
 		facts, observeErr = coordinator.Observe(ctx, options.host, options.user)
 	}
@@ -94,7 +112,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	}
 
 	record, cached := facts.Record, facts.Cached
-	if !routed && !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
+	if !routed && !(attach && options.dryRun) && !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
 		say("probing %s", target.Name)
 		refreshed, err := coordinator.Refresh(ctx, facts, false)
 		facts = refreshed
@@ -114,6 +132,9 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		Flags:       plan.Flags{SSH: flags.ssh, Mosh: flags.mosh, TTY: flags.tty},
 		MoshUnfit:   flags.moshUnfit,
 		NativeUnfit: flags.nativeUnfit,
+	}
+	if native {
+		req.Native = negotiation.NativeRef(facts, "ssh:")
 	}
 	output, err := negotiation.Evaluate(settings, facts, req)
 
@@ -157,12 +178,14 @@ func defaultInner(inner []string, session, host string, remote probe.Remote, kno
 	switch {
 	case !known:
 		return nil, fmt.Sprintf("no host record for %s; opening a login shell instead of session %s", host, session)
+	case remote.WeztermRemote != "":
+		return []string{"wezterm-remote", "attach", session}, ""
 	case remote.Zmx != "":
 		return []string{"zmx", "attach", session}, ""
 	case remote.Tmux != "":
 		return []string{"tmux", "new", "-A", "-s", session}, ""
 	default:
-		return nil, fmt.Sprintf("neither zmx nor tmux on %s; opening a login shell instead of session %s", host, session)
+		return nil, fmt.Sprintf("no supported session provider on %s; opening a login shell instead of session %s", host, session)
 	}
 }
 
@@ -176,6 +199,21 @@ func realize(prog string, streams Streams, tools probe.Tools, output plan.Output
 		loses = " (loses " + strings.Join(output.Loses, ", ") + ")"
 	}
 	switch output.Hop.Kind {
+	case "native":
+		path, err := tools.LookPath("wezterm")
+		if err != nil {
+			fmt.Fprintf(streams.Stderr, "%s: wezterm: %v\n", prog, err)
+			return 1
+		}
+		if !quiet {
+			fmt.Fprintf(streams.Stderr, "%s: native-mux -> %s\n", prog, output.Hop.Ref)
+		}
+		argv := []string{"wezterm", "start", "--new-tab", "--attach", "--domain", output.Hop.Ref}
+		if err := streams.exec(path, argv, os.Environ()); err != nil {
+			fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, err)
+			return 1
+		}
+		return 0
 	case "local":
 		if len(output.Plan.Command) == 0 {
 			fmt.Fprintf(streams.Stderr, "%s: plan has no command\n", prog)

@@ -13,17 +13,18 @@ import (
 var tshSpecification = completion.Command{
 	Name:              "tsh",
 	Description:       "ssh, with the hop negotiated",
-	Synopsis:          "tsh [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]",
+	Synopsis:          "tsh [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [--foreground] [user@]<host> [-- <command>]",
 	LongDescription:   "A drop-in for `ssh host` and `mosh host`: resolve the host (ssh config alias, then tailnet peer), probe when the record is stale, rank the tiers, and exec the winner. ssh options ride the ssh tier verbatim and the mosh tier through --ssh; one that mosh cannot carry (a port forward) filters mosh out with the reason.",
 	CompletionCommand: []string{"tether", "hosts", "--names"},
 	Flags: []completion.Flag{
-		{Name: "session", Short: "s", Description: "Attach this remote mux session (zmx, else tmux) instead of a login shell", Value: true},
+		{Name: "session", Short: "s", Description: "Attach this remote session (wezterm-remote, zmx, or tmux) instead of a login shell", Value: true},
 		{Name: "quiet", Short: "q", Description: "Do not announce the winning hop on stderr"},
 		{Name: "login", Short: "l", Description: "Remote user, as ssh -l", Value: true},
 		{Name: "port", Short: "p", Description: "Remote port, as ssh -p", Value: true},
 		{Name: "mode", Description: "Ordering mode; overrides the config", Value: true, Values: modeNames},
 		{Name: "pin", Description: "Tier that must win; overrides the config", Value: true, Values: tierNames},
 		{Name: "dry-run", Description: "Write the tether.plan/v1 document and exit without connecting"},
+		{Name: "foreground", Description: "Keep the connection in this terminal"},
 		{Name: "no-probe", Description: "Never run the ssh round trip; plan from the cache only"},
 		{Name: "version", Description: "Write the version to stdout"},
 		{Name: "help", Short: "h", Description: "Print command help"},
@@ -76,18 +77,19 @@ type sshOption struct {
 
 // tshOptions is one parsed tsh invocation.
 type tshOptions struct {
-	host    string
-	user    string // from -l or user@host; "" keeps the config user
-	options []sshOption
-	session string
-	mode    string
-	pin     string
-	quiet   bool
-	dryRun  bool
-	noProbe bool
-	help    bool
-	version bool
-	command []string
+	host       string
+	user       string // from -l or user@host; "" keeps the config user
+	options    []sshOption
+	session    string
+	mode       string
+	pin        string
+	quiet      bool
+	dryRun     bool
+	noProbe    bool
+	foreground bool
+	help       bool
+	version    bool
+	command    []string
 }
 
 // parseTSH reads an ssh-shaped argv: options first, then [user@]host, then
@@ -135,6 +137,8 @@ func parseTSH(args []string) (tshOptions, error) {
 				options.quiet = true
 			case "dry-run":
 				options.dryRun = true
+			case "foreground":
+				options.foreground = true
 			case "no-probe":
 				options.noProbe = true
 			case "help":

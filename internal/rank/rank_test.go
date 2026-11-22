@@ -65,7 +65,7 @@ func TestRankDecisionTable(t *testing.T) {
 			want: "mosh-mux,ssh", filtered: "native-mux,ssh-raw", reason: "ssh-raw filtered: ssh options do not reach a wezterm domain"},
 		{name: "no remote zmx nor tmux removes mosh-mux",
 			caps: with(full, func(c *Caps) { c.RemoteZmx = false; c.RemoteTmux = false }), link: steady, prefs: prefs(ModeAuto),
-			want: "native-mux,ssh-raw,ssh", filtered: "mosh-mux", reason: "remote zmx and tmux absent"},
+			want: "native-mux,ssh-raw,ssh", filtered: "mosh-mux", reason: "remote wezterm-remote, zmx, and tmux absent"},
 		{name: "tmux alone keeps mosh-mux",
 			caps: with(full, func(c *Caps) { c.RemoteZmx = false }), link: steady, prefs: prefs(ModeAuto),
 			want: "native-mux,mosh-mux,ssh-raw,ssh"},
