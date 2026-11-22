@@ -1,0 +1,55 @@
+README.md
+  s_a4a3eea4720821::t_ec06920aea2d35 99-124,127-128,188,272,274,282-283,304
+completions/_tether
+  s_a4a3eea4720821::t_cc96015200fc9d 89-90,143-144
+completions/tether.bash
+  s_a4a3eea4720821::t_076c927f8b4b3d 95-96,153
+completions/tether.fish
+  s_a4a3eea4720821::t_db7de68be49254 113-117,162,183-184
+completions/tether.nu
+  s_a4a3eea4720821::t_834602339fdcef 32-33
+extras/wezterm/README.md
+  s_a4a3eea4720821::t_b5379bcecbdbb7 3-5
+extras/wezterm/main.go
+  s_a4a3eea4720821::t_8b88a3142b9456 11,44-45,62-65,99,108-112,124-154,156,181-185,197
+extras/wezterm/main_test.go
+  s_a4a3eea4720821::t_9ec58e095a08f0 90-126
+extras/wezterm/provider.json
+  s_a4a3eea4720821::t_f20a85798480e6 20-21
+internal/command/connect.go
+  s_a4a3eea4720821::t_3c36c8b885aad3 74-86,97,113
+internal/command/route_test.go
+  s_a4a3eea4720821::t_7c170536696f42 1-92
+internal/command/run.go
+  s_a4a3eea4720821::t_69a50466530e45 53-55,61-62,81,83,229-230,253-261,263-268,272-274,276,312,321,342-372
+internal/config/config.go
+  s_a4a3eea4720821::t_89159476b4c06a 29-31,72-75,77-86,112-116
+internal/hosts/hosts.go
+  s_a4a3eea4720821::t_3700ce6366bee2 32-34
+internal/negotiation/plan.go
+  s_a4a3eea4720821::t_89e2290d5cc6fc 16,31-34,36-37,93-94
+internal/negotiation/route.go
+  s_a4a3eea4720821::t_53eeaea76e3ac5 1-66
+internal/probe/remote.go
+  s_a4a3eea4720821::t_73a87e23ad943a 30-38,51-54
+schema/config.schema.json
+  s_a4a3eea4720821::t_91539c1a2af739 24-37
+schema/tether.hosts.v1.schema.json
+  s_a4a3eea4720821::t_6bf4209d2e32cd 6-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3734731ded4f0f8f338f1b338302709a9b0bc6d1",
+  "prompts": {},
+  "sessions": {
+    "s_a4a3eea4720821": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f4ef-68fa-7c11-b609-3f16bf1d9bf7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Roshan Bhatia <rshnbhatia@gmail.com>"
+    }
+  }
+}
