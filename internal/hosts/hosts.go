@@ -29,6 +29,9 @@ const (
 // Host is one candidate. Name is what connect and the host record use;
 // Target is what ssh and mosh are given.
 type Host struct {
+	Addresses []string `json:"addresses,omitempty" jsonschema:"description=Primary alias followed by fallback aliases in connection order"`
+	Aliases   []string `json:"aliases,omitempty" jsonschema:"description=Equivalent direct aliases searchable in the host catalog"`
+
 	Name     string      `json:"name"`
 	Source   string      `json:"source" jsonschema:"enum=ssh-config,enum=tailnet,enum=both"`
 	Hostname string      `json:"hostname" jsonschema:"description=HostName from ssh -G, else the MagicDNS name"`

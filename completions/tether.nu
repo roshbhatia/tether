@@ -29,6 +29,8 @@ export extern "tether plan" [
   --session: string # Session name echoed in the output
   --native: string # Opaque ref of the caller's native mux domain
   --native-raw: string # Opaque ref of the caller's raw ssh domain
+  --resolve # Check configured addresses in preference order
+  --native-prefix: string # Build the native domain ref from the selected SSH alias
   --mode: string@"__tether_completion_values_4" # Ordering mode; overrides the config
   --pin: string@"__tether_completion_values_5" # Tier that must win; overrides the config
   --help(-h) # Print command help

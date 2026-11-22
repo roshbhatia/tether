@@ -86,6 +86,8 @@ _tether() {
       'plan:--native='*) continue ;;
       'plan:--native-raw') consume_value=1; continue ;;
       'plan:--native-raw='*) continue ;;
+      'plan:--native-prefix') consume_value=1; continue ;;
+      'plan:--native-prefix='*) continue ;;
       'plan:--mode') consume_value=1; continue ;;
       'plan:--mode='*) continue ;;
       'plan:--pin') consume_value=1; continue ;;
@@ -138,6 +140,8 @@ _tether() {
         '--session[Session name echoed in the output]:value:' \
         '--native[Opaque ref of the callers native mux domain]:value:' \
         '--native-raw[Opaque ref of the callers raw ssh domain]:value:' \
+        '--resolve[Check configured addresses in preference order]' \
+        '--native-prefix[Build the native domain ref from the selected SSH alias]:value:' \
         '--mode[Ordering mode; overrides the config]:value:__tether_completion_values_4' \
         '--pin[Tier that must win; overrides the config]:value:__tether_completion_values_5' \
         '(-h)--help[Print command help]' \

@@ -1,6 +1,8 @@
 # wezterm
 
-Open remote hosts from the WezTerm picker.
+Open remote hosts from the WezTerm picker. Each row represents a logical host.
+Selecting a row checks its ordered SSH addresses and attaches the corresponding
+native mux domain when available. Other hosts open a local transport pane.
 
 ## Install
 

@@ -17,7 +17,8 @@
       "description": "picker.list"
     },
     "picker.open": {
-      "description": "picker.open"
+      "description": "picker.open",
+      "timeout": "16s"
     }
   },
   "defaults": {

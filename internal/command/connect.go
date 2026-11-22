@@ -71,7 +71,19 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	}
 
 	coordinator := streams.coordinator(settings)
-	facts, observeErr := coordinator.Observe(ctx, options.host, options.user)
+	addresses := settings.AddressesFor(options.host)
+	routed := len(addresses) > 1 && !options.noProbe && !options.dryRun && len(options.options) == 0
+	var facts negotiation.Facts
+	var observeErr error
+	if routed {
+		facts, observeErr = coordinator.Resolve(ctx, addresses, options.user)
+	} else {
+		facts, observeErr = coordinator.Observe(ctx, options.host, options.user)
+	}
+	if observeErr != nil {
+		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, observeErr)
+		return 1
+	}
 	target, known := facts.Resolution.Host, facts.Resolution.Known
 	if !known {
 		say("%s is not in the ssh config or advertised as a Tailscale SSH host; trying ssh anyway", options.host)
@@ -81,12 +93,8 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 		return 1
 	}
 
-	if observeErr != nil {
-		fmt.Fprintf(streams.Stderr, "%s: %v\n", prog, observeErr)
-		return 1
-	}
 	record, cached := facts.Record, facts.Cached
-	if !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
+	if !routed && !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
 		say("probing %s", target.Name)
 		refreshed, err := coordinator.Refresh(ctx, facts, false)
 		facts = refreshed
@@ -102,7 +110,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	}
 	flags := carry(options.options, options.user != "")
 	req := negotiation.Request{
-		Session: options.session, Mode: options.mode, Pin: options.pin, Inner: inner,
+		Host: options.host, Session: options.session, Mode: options.mode, Pin: options.pin, Inner: inner,
 		Flags:       plan.Flags{SSH: flags.ssh, Mosh: flags.mosh, TTY: flags.tty},
 		MoshUnfit:   flags.moshUnfit,
 		NativeUnfit: flags.nativeUnfit,

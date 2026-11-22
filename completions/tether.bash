@@ -92,6 +92,8 @@ _tether_complete() {
       'plan:--native='*) continue ;;
       'plan:--native-raw') consume_value=1; continue ;;
       'plan:--native-raw='*) continue ;;
+      'plan:--native-prefix') consume_value=1; continue ;;
+      'plan:--native-prefix='*) continue ;;
       'plan:--mode') consume_value=1; continue ;;
       'plan:--mode='*) continue ;;
       'plan:--pin') consume_value=1; continue ;;
@@ -148,7 +150,7 @@ _tether_complete() {
       ;;
     'plan')
       __tether_completion_filter "$current" < <(
-        printf '%s\n' '--host' '--session' '--native' '--native-raw' '--mode' '--pin' '--help' '-h'
+        printf '%s\n' '--host' '--session' '--native' '--native-raw' '--resolve' '--native-prefix' '--mode' '--pin' '--help' '-h'
       )
       ;;
     'probe')

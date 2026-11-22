@@ -96,9 +96,36 @@ own options before the host, so the wrapper cannot bootstrap `mosh-server`
 either. Plain `ssh` to a MagicDNS name reaches a Tailscale SSH server without
 the wrapper.
 
+### Preferred addresses and fallback
+
+A configured host is one catalog row. Its name is the preferred SSH route.
+`fallback` lists additional SSH aliases in connection order. `aliases` folds
+equivalent names into the catalog entry without adding a retry. All remain
+direct SSH destinations and appear in `tether hosts --names`.
+
+```json
+{
+  "hosts": {
+    "arrakis": {
+      "fallback": ["arrakis.local"],
+      "aliases": ["arrakis.stork-eel.ts.net."]
+    }
+  }
+}
+```
+
+`tether plan --resolve` checks routes before ranking. The same resolution is
+used by `tsh` when a configured name has fallback addresses and there are no
+SSH option overrides. The read-only SSH inventory requires a known host key.
+It advances after DNS or connection failures or an offline tailnet route.
+Authentication failures, host-key failures, and other errors end resolution.
+Use `--native-prefix ssh:` with a caller that registers WezTerm domains under
+that prefix. It uses the selected configured SSH alias for the domain.
+
 ## Probe layers
 
-`tether plan` runs the first two layers only and never touches the network.
+`tether plan` uses only local observations and cached inventory by default.
+`--resolve` explicitly performs read-only SSH inventory checks.
 
 - Local (ms): `command -v mosh wezterm ssh`; `ssh -G <host>` resolves the alias.
 - Registry (ms): `tailscale status --json` from the local daemon. A `*.ts.net`
@@ -158,7 +185,7 @@ something other than `host`, such as `ops@vault.stork-eel.ts.net`.
   `tether.hosts/v1`, `tether.config/v1`. A host record of another version is a
   cache miss.
 - `tsh` (`tether connect`) is the one verb that may do a round trip without
-  being asked: the user is about to connect anyway. `plan` never does.
+  being asked: the user is about to connect anyway. `plan` does so only with `--resolve`.
 - `tsh` is a second `main` over the same command package, not an argv[0]
   switch: a wrapper or `nix run` that rewrites argv[0] cannot turn it back
   into `tether`, and the version ldflag lands in both binaries.
@@ -242,9 +269,9 @@ Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe 
 
 ### `tether plan`
 
-tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]
+tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--resolve] [--native-prefix <prefix>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]
 
-Read the local tools, the tailscale registry, and the cached remote inventory, then rank the tiers. The inner argv after -- is wrapped, never composed.
+Read the local tools, the tailscale registry, and the cached remote inventory, then rank the tiers. --resolve probes the preferred and fallback addresses before ranking. The inner argv after -- is wrapped, never composed.
 
 | Option | Description |
 | --- | --- |
@@ -252,6 +279,8 @@ Read the local tools, the tailscale registry, and the cached remote inventory, t
 | `--session` `<value>` | Session name echoed in the output |
 | `--native` `<value>` | Opaque ref of the caller's native mux domain |
 | `--native-raw` `<value>` | Opaque ref of the caller's raw ssh domain |
+| `--resolve` | Check configured addresses in preference order |
+| `--native-prefix` `<value>` | Build the native domain ref from the selected SSH alias |
 | `--mode` `<value>` | Ordering mode; overrides the config |
 | `--pin` `<value>` | Tier that must win; overrides the config |
 | `--help`, `-h` | Print command help |
@@ -272,7 +301,7 @@ Run the local, registry, remote, and link layers. One ssh round trip; a tailnet 
 
 tether hosts [--json] [--names]
 
-The union of the literal Host entries in ~/.ssh/config and the peers of the tailnet, with each host's source, online state, OS, and whether it advertises Tailscale SSH.
+Group explicitly configured aliases from the SSH config and tailnet. --names also returns individual addresses for direct SSH and completion.
 
 | Option | Description |
 | --- | --- |

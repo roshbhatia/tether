@@ -87,37 +87,42 @@ func TestEmptyList(t *testing.T) {
 }
 
 func TestHostOpen(t *testing.T) {
-	a := fakeCore(t, `printf '{"hosts":[{"name":"builder","hostname":"builder.example","target":"dev@builder.example","peer":{"online":true}}]}'`)
-	r := invoke(t, a, "picker.open", "builder")
-	if r.Status != "ok" {
-		t.Fatal(r)
-	}
-	data, _ := json.Marshal(r.Output)
-	var got plan
-	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatal(err)
-	}
-	if len(got.Command) != 2 || got.Command[0] != filepath.Join(filepath.Dir(a.core), "tsh") || got.Command[1] != "dev@builder.example" {
-		t.Fatalf("wrong plan: %+v", got)
-	}
-	r = invoke(t, a, "picker.list", "")
-	data, _ = json.Marshal(r.Output)
-	if !strings.Contains(string(data), `"text":"online"`) {
-		t.Fatalf("lost peer state: %s", data)
-	}
-	if r := invoke(t, a, "picker.open", "removed"); r.Status != "error" {
-		t.Fatal("accepted removed host")
-	}
-}
-func TestValidateRequiresConnector(t *testing.T) {
-	a := fakeCore(t, "exit 0")
-	if r := invoke(t, a, "provider.validate", ""); r.Status != "error" {
-		t.Fatal("accepted missing tsh")
-	}
-	if err := os.WriteFile(filepath.Join(filepath.Dir(a.core), "tsh"), []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if r := invoke(t, a, "provider.validate", ""); r.Status != "ok" {
-		t.Fatal(r)
+	for _, tc := range []struct {
+		kind     string
+		resolved string
+	}{
+		{"attach", `{"hop":{"kind":"native","ref":"ssh:builder.local"}}`},
+		{"spawn", `{"hop":{"kind":"local"},"plan":{"command":["ssh","builder.local"]}}`},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			core := `case "$1" in
+				hosts) printf '%s' '{"hosts":[{"name":"builder","hostname":"builder.example","addresses":["builder","builder.local"],"peer":{"online":true}}]}' ;;
+				plan) [ "$*" = "plan --host builder --resolve --mode native --native-prefix ssh:" ] || exit 99
+					printf '%s' '` + tc.resolved + `' ;;
+				*) exit 1 ;;
+			esac`
+			a := fakeCore(t, core)
+			r := invoke(t, a, "picker.open", "builder")
+			if r.Status != "ok" {
+				t.Fatal(r)
+			}
+			data, _ := json.Marshal(r.Output)
+			var got plan
+			if err := json.Unmarshal(data, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.Kind != tc.kind || (got.Kind == "attach" && got.Domain != "ssh:builder.local") ||
+				(got.Kind == "spawn" && (len(got.Command) != 2 || got.Command[0] != "ssh" || got.Command[1] != "builder.local")) {
+				t.Fatalf("wrong plan: %+v", got)
+			}
+			r = invoke(t, a, "picker.list", "")
+			data, _ = json.Marshal(r.Output)
+			if !strings.Contains(string(data), "online · alternate address") || !strings.Contains(string(data), "builder.local") {
+				t.Fatalf("lost address state: %s", data)
+			}
+			if r := invoke(t, a, "picker.open", "removed"); r.Status != "error" {
+				t.Fatal("accepted removed host")
+			}
+		})
 	}
 }

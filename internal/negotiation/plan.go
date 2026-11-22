@@ -13,6 +13,7 @@ import (
 
 // Request is one plan: the caller's refs and overrides plus the inner argv.
 type Request struct {
+	Host        string
 	Session     string
 	Native      string
 	NativeRaw   string
@@ -27,9 +28,13 @@ type Request struct {
 // Evaluate renders a plan from observed facts without I/O.
 func Evaluate(settings config.Config, observed Facts, req Request) (plan.Output, error) {
 	target := observed.Resolution.Host
+	name := req.Host
+	if name == "" {
+		name = target.Name
+	}
 	prefs := rank.Prefs{
-		Mode:       settings.ModeFor(target.Name),
-		Pin:        settings.PinFor(target.Name),
+		Mode:       settings.ModeFor(name),
+		Pin:        settings.PinFor(name),
 		FlakyRTTMs: settings.Flaky.RTTMs,
 		FlakyLoss:  settings.Flaky.Loss,
 	}
@@ -85,8 +90,8 @@ func Evaluate(settings config.Config, observed Facts, req Request) (plan.Output,
 	if result.Offline {
 		probeInfo.Stale = true
 	}
-	subject := plan.Subject{Host: target.Name, Session: req.Session, Flags: req.Flags}
-	if target.Target != target.Name {
+	subject := plan.Subject{Host: name, Session: req.Session, Flags: req.Flags}
+	if target.Target != name {
 		subject.Target = target.Target
 	}
 	if err != nil {

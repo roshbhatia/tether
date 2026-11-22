@@ -50,14 +50,16 @@ var specification = completion.Command{
 		},
 		{
 			Name:            "plan",
-			Description:     "Choose a tier from the cache, never the network",
-			Synopsis:        "tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]",
-			LongDescription: "Read the local tools, the tailscale registry, and the cached remote inventory, then rank the tiers. The inner argv after -- is wrapped, never composed.",
+			Description:     "Choose a tier from the cache or resolve an address explicitly",
+			Synopsis:        "tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--resolve] [--native-prefix <prefix>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]",
+			LongDescription: "Read the local tools, the tailscale registry, and the cached remote inventory, then rank the tiers. --resolve probes the preferred and fallback addresses before ranking. The inner argv after -- is wrapped, never composed.",
 			Flags: []completion.Flag{
 				{Name: "host", Description: "ssh config alias or tailnet peer", Value: true, CompletionCommand: []string{"tether", "hosts", "--names"}},
 				{Name: "session", Description: "Session name echoed in the output", Value: true},
 				{Name: "native", Description: "Opaque ref of the caller's native mux domain", Value: true},
 				{Name: "native-raw", Description: "Opaque ref of the caller's raw ssh domain", Value: true},
+				{Name: "resolve", Description: "Check configured addresses in preference order"},
+				{Name: "native-prefix", Description: "Build the native domain ref from the selected SSH alias", Value: true},
 				{Name: "mode", Description: "Ordering mode; overrides the config", Value: true, Values: modeNames},
 				{Name: "pin", Description: "Tier that must win; overrides the config", Value: true, Values: tierNames},
 				{Name: "help", Short: "h", Description: "Print command help"},
@@ -76,9 +78,9 @@ var specification = completion.Command{
 		},
 		{
 			Name:            "hosts",
-			Description:     "List the hosts connect can name",
+			Description:     "List logical hosts and their SSH addresses",
 			Synopsis:        "tether hosts [--json] [--names]",
-			LongDescription: "The union of the literal Host entries in ~/.ssh/config and the peers of the tailnet, with each host's source, online state, OS, and whether it advertises Tailscale SSH.",
+			LongDescription: "Group explicitly configured aliases from the SSH config and tailnet. --names also returns individual addresses for direct SSH and completion.",
 			Flags: []completion.Flag{
 				{Name: "json", Description: "Write tether.hosts/v1 instead of a table"},
 				{Name: "names", Description: "Write one name per line, for completion"},
@@ -224,6 +226,8 @@ func runPlan(args []string, streams Streams) int {
 	session := flags.String("session", "", "")
 	native := flags.String("native", "", "")
 	nativeRaw := flags.String("native-raw", "", "")
+	resolve := flags.Bool("resolve", false, "")
+	prefix := flags.String("native-prefix", "", "")
 	mode := flags.String("mode", "", "")
 	pin := flags.String("pin", "", "")
 	if err := flags.Parse(args); err != nil {
@@ -246,13 +250,30 @@ func runPlan(args []string, streams Streams) int {
 		return 1
 	}
 	ctx := context.Background()
-	facts, err := streams.coordinator(settings).Observe(ctx, *host, "")
+	coordinator := streams.coordinator(settings)
+	var facts negotiation.Facts
+	if *resolve {
+		ctx, cancel := context.WithTimeout(ctx, 13*time.Second)
+		defer cancel()
+		facts, err = coordinator.Resolve(ctx, settings.AddressesFor(*host), "")
+	} else {
+		facts, err = coordinator.Observe(ctx, *host, "")
+	}
 	if err != nil {
+		if *resolve {
+			output := plan.Failure(plan.Subject{Host: *host, Session: *session}, err, rank.Result{}, plan.Probe{Stale: true})
+			if code := writeJSON(streams, output); code != 0 {
+				return code
+			}
+		}
 		fmt.Fprintf(streams.Stderr, "tether plan: %v\n", err)
 		return 1
 	}
+	if *native == "" && *prefix != "" && (facts.Resolution.Host.Source == hosts.SourceSSHConfig || facts.Resolution.Host.Source == hosts.SourceBoth) {
+		*native = *prefix + strings.ToLower(facts.Resolution.Host.Name)
+	}
 	output, err := negotiation.Evaluate(settings, facts, negotiation.Request{
-		Session: *session, Native: *native, NativeRaw: *nativeRaw, Mode: *mode, Pin: *pin, Inner: flags.Args(),
+		Host: *host, Session: *session, Native: *native, NativeRaw: *nativeRaw, Mode: *mode, Pin: *pin, Inner: flags.Args(),
 	})
 
 	if code := writeJSON(streams, output); code != 0 {
@@ -288,6 +309,7 @@ func runHosts(args []string, streams Streams) int {
 	}
 	switch {
 	case *asJSON:
+		output.Hosts = groupHosts(output.Hosts, settings)
 		return writeJSON(streams, output)
 	case *names:
 		for _, host := range output.Hosts {
@@ -296,7 +318,7 @@ func runHosts(args []string, streams Streams) int {
 		return 0
 	}
 	rows := [][]string{{"NAME", "SOURCE", "HOSTNAME", "ONLINE", "OS", "TAILSCALE-SSH"}}
-	for _, host := range output.Hosts {
+	for _, host := range groupHosts(output.Hosts, settings) {
 		online, os, ssh := "-", "-", "-"
 		if host.Peer != nil {
 			online, os = "yes", host.Peer.OS
@@ -315,6 +337,37 @@ func runHosts(args []string, streams Streams) int {
 	}
 	writeTable(streams.Stdout, rows)
 	return 0
+}
+
+func groupHosts(rows []hosts.Host, settings config.Config) []hosts.Host {
+	known := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		known[row.Name] = true
+	}
+	members := map[string]bool{}
+	for name, entry := range settings.Hosts {
+		if !known[name] {
+			continue
+		}
+		for _, alias := range settings.AddressesFor(name)[1:] {
+			members[strings.ToLower(alias)] = true
+		}
+		for _, alias := range entry.Aliases {
+			members[strings.ToLower(alias)] = true
+		}
+	}
+	grouped := make([]hosts.Host, 0, len(rows))
+	for _, row := range rows {
+		if members[strings.ToLower(row.Name)] {
+			continue
+		}
+		if entry, ok := settings.Hosts[row.Name]; ok {
+			row.Addresses = settings.AddressesFor(row.Name)
+			row.Aliases = entry.Aliases
+		}
+		grouped = append(grouped, row)
+	}
+	return grouped
 }
 
 func writeTable(out io.Writer, rows [][]string) {

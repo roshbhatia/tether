@@ -21,6 +21,20 @@
     },
     "Host": {
       "properties": {
+        "fallback": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "SSH aliases to try in order after the primary address is unreachable"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Additional direct SSH names folded into this host in the catalog"
+        },
         "pin": {
           "type": "string",
           "enum": [

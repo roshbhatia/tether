@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -41,7 +41,8 @@ type item struct {
 type plan struct {
 	Kind        string            `json:"kind"`
 	Label       string            `json:"label"`
-	Cwd         string            `json:"cwd"`
+	Cwd         string            `json:"cwd,omitempty"`
+	Domain      string            `json:"domain,omitempty"`
 	Command     []string          `json:"command"`
 	Environment map[string]string `json:"environment"`
 }
@@ -58,6 +59,10 @@ func (a adapter) run(output any, args ...string) error {
 		return fmt.Errorf("%s: %w", a.core, ctx.Err())
 	}
 	if err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && len(exit.Stderr) > 0 {
+			return errors.New(strings.TrimSpace(string(exit.Stderr)))
+		}
 		return fmt.Errorf("%s: %w", a.core, err)
 	}
 	if output == nil {
@@ -91,7 +96,7 @@ func main() {
 	if len(os.Args) > 1 {
 		core = os.Args[1]
 	}
-	if err := serve(os.Stdin, os.Stdout, adapter{core: core, timeout: 4 * time.Second}); err != nil {
+	if err := serve(os.Stdin, os.Stdout, adapter{core: core, timeout: 15 * time.Second}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -100,10 +105,11 @@ func main() {
 const defaultCore = "tether"
 
 type host struct {
-	Name     string `json:"name"`
-	Hostname string `json:"hostname"`
-	Target   string `json:"target"`
-	Peer     *struct {
+	Name      string   `json:"name"`
+	Hostname  string   `json:"hostname"`
+	Addresses []string `json:"addresses"`
+	Aliases   []string `json:"aliases"`
+	Peer      *struct {
 		Online bool `json:"online"`
 	} `json:"peer"`
 }
@@ -115,19 +121,44 @@ func (a adapter) hosts() ([]host, error) {
 	err := a.run(&result, "hosts", "--json")
 	return result.Hosts, err
 }
-func (a adapter) connector() string {
-	if filepath.Base(a.core) != a.core {
-		return filepath.Join(filepath.Dir(a.core), "tsh")
+func (a adapter) open(name string) (plan, error) {
+	var selected struct {
+		Hop *struct {
+			Kind string `json:"kind"`
+			Ref  string `json:"ref"`
+		} `json:"hop"`
+		Plan *struct {
+			Command     []string          `json:"command"`
+			Environment map[string]string `json:"environment"`
+		} `json:"plan"`
 	}
-	return "tsh"
+	err := a.run(&selected, "plan", "--host", name, "--resolve", "--mode", "native", "--native-prefix", "ssh:")
+	if err != nil {
+		return plan{}, err
+	}
+	if selected.Hop == nil {
+		return plan{}, errors.New("no usable transport")
+	}
+	if selected.Hop.Kind == "native" && selected.Hop.Ref != "" {
+		return plan{Kind: "attach", Label: name, Domain: selected.Hop.Ref}, nil
+	}
+	if selected.Hop.Kind != "local" || selected.Plan == nil || len(selected.Plan.Command) == 0 {
+		return plan{}, errors.New("unrecognized transport plan")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return plan{}, err
+	}
+	environment := selected.Plan.Environment
+	if environment == nil {
+		environment = map[string]string{}
+	}
+	return plan{Kind: "spawn", Label: name, Cwd: home, Command: selected.Plan.Command, Environment: environment}, nil
 }
 func (a adapter) handle(r request) (any, error) {
 	switch r.Capability {
 	case "provider.validate":
 		if err := a.run(nil, "--help"); err != nil {
-			return nil, err
-		}
-		if _, err := exec.LookPath(a.connector()); err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
@@ -147,7 +178,11 @@ func (a adapter) handle(r request) (any, error) {
 					state = "online"
 				}
 			}
-			items = append(items, item{row.Name, row.Name + " " + row.Hostname, []segment{{row.Name, "name"}, {row.Hostname, "path"}, {state, "detail"}}})
+			if len(row.Addresses) > 1 {
+				state += " · alternate address"
+			}
+			search := strings.Join(append(append([]string{row.Name, row.Hostname}, row.Addresses...), row.Aliases...), " ")
+			items = append(items, item{row.Name, search, []segment{{row.Name, "name"}, {row.Hostname, "path"}, {state, "detail"}}})
 		}
 		return map[string]any{"items": items}, nil
 	case "picker.open":
@@ -159,15 +194,7 @@ func (a adapter) handle(r request) (any, error) {
 			if row.Name != r.Input.ID {
 				continue
 			}
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return nil, err
-			}
-			target := row.Target
-			if target == "" {
-				target = row.Name
-			}
-			return plan{"spawn", row.Name, home, []string{a.connector(), target}, map[string]string{}}, nil
+			return a.open(row.Name)
 		}
 		return nil, errors.New("host no longer exists")
 	default:

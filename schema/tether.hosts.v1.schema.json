@@ -3,6 +3,20 @@
   "$defs": {
     "Host": {
       "properties": {
+        "addresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Primary alias followed by fallback aliases in connection order"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Equivalent direct aliases searchable in the host catalog"
+        },
         "name": {
           "type": "string"
         },

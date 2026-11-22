@@ -110,6 +110,11 @@ function __tether_completion_context
         continue
       case 'plan:--native-raw=*'
         continue
+      case 'plan:--native-prefix'
+        set consume_value 1
+        continue
+      case 'plan:--native-prefix=*'
+        continue
       case 'plan:--mode'
         set consume_value 1
         continue
@@ -154,7 +159,7 @@ complete -c tether -n 'test (__tether_completion_context) = ""' -l help -s h -d 
 complete -c tether -n 'test (__tether_completion_context) = ""' -l version -d 'Write the version to stdout'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a completion -d 'Generate shell completions'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a connect -d 'tether connect [ssh options] [-s <session>] [-q] [--pin <tier>] [--mode <mode>] [--dry-run] [--no-probe] [user@]<host> [-- <command>]'
-complete -c tether -f -n 'test (__tether_completion_context) = ""' -a plan -d 'tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]'
+complete -c tether -f -n 'test (__tether_completion_context) = ""' -a plan -d 'tether plan --host <host> [--session <name>] [--native <ref>] [--native-raw <ref>] [--resolve] [--native-prefix <prefix>] [--mode <mode>] [--pin <tier>] [-- <inner argv>]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a probe -d 'tether probe --host <host> [--force]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a hosts -d 'tether hosts [--json] [--names]'
 complete -c tether -f -n 'test (__tether_completion_context) = ""' -a status -d 'tether status [--host <host>]'
@@ -175,6 +180,8 @@ complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l host -
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l session -r -d 'Session name echoed in the output'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l native -r -d 'Opaque ref of the caller\'s native mux domain'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l native-raw -r -d 'Opaque ref of the caller\'s raw ssh domain'
+complete -c tether -n 'test (__tether_completion_context) = "plan"' -l resolve -d 'Check configured addresses in preference order'
+complete -c tether -n 'test (__tether_completion_context) = "plan"' -l native-prefix -r -d 'Build the native domain ref from the selected SSH alias'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l mode -r -a '(__tether_completion_values_4)' -d 'Ordering mode; overrides the config'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -f -l pin -r -a '(__tether_completion_values_5)' -d 'Tier that must win; overrides the config'
 complete -c tether -n 'test (__tether_completion_context) = "plan"' -l help -s h -d 'Print command help'

@@ -26,6 +26,9 @@ type Flaky struct {
 
 // Host holds per-host overrides.
 type Host struct {
+	Fallback []string `json:"fallback,omitempty" yaml:"fallback" jsonschema:"description=SSH aliases to try in order after the primary address is unreachable"`
+	Aliases  []string `json:"aliases,omitempty" yaml:"aliases" jsonschema:"description=Additional direct SSH names folded into this host in the catalog"`
+
 	Pin  string    `json:"pin,omitempty" yaml:"pin" jsonschema:"enum=native-mux,enum=mosh-mux,enum=ssh-raw,enum=ssh,description=Tier that always wins; an unavailable pin is an error"`
 	Mode rank.Mode `json:"mode,omitempty" yaml:"mode" jsonschema:"enum=auto,enum=native,enum=roam,enum=persist,description=Mode for this host; overrides the top-level mode"`
 	User string    `json:"user,omitempty" yaml:"user" jsonschema:"description=Remote user; prepended as user@ to the ssh target"`
@@ -66,7 +69,21 @@ func (config Config) Validate() error {
 	if !config.Mode.Valid() {
 		return fmt.Errorf("mode %q is not one of %s", config.Mode, strings.Join(rank.ModeNames(), ", "))
 	}
+	owners := map[string]string{}
+	for name := range config.Hosts {
+		owners[strings.ToLower(name)] = name
+	}
 	for name, host := range config.Hosts {
+		for _, alias := range append(append([]string(nil), host.Fallback...), host.Aliases...) {
+			key := strings.ToLower(alias)
+			if alias == "" || strings.HasPrefix(alias, "-") || strings.ContainsAny(alias, " @/\t\r\n") {
+				return fmt.Errorf("hosts.%s: invalid SSH alias %q", name, alias)
+			}
+			if owner, exists := owners[key]; exists {
+				return fmt.Errorf("hosts.%s: SSH alias %q is already assigned to %s", name, alias, owner)
+			}
+			owners[key] = name
+		}
 		if err := (rank.Prefs{Mode: host.Mode, Pin: host.Pin}).Validate(); err != nil {
 			return fmt.Errorf("hosts.%s.%w", name, err)
 		}
@@ -90,6 +107,11 @@ func (config Config) PinFor(host string) string {
 // UserFor returns the host's configured remote user, or "".
 func (config Config) UserFor(host string) string {
 	return config.Hosts[host].User
+}
+
+// AddressesFor returns the SSH names in connection order.
+func (config Config) AddressesFor(host string) []string {
+	return append([]string{host}, config.Hosts[host].Fallback...)
 }
 
 // Schema returns the JSON Schema for the configuration file.

@@ -27,6 +27,15 @@ func RemoteScript() string {
 // RemoteLayer does the one ssh round trip. BatchMode forbids prompts and
 // ConnectTimeout bounds a silent host.
 func RemoteLayer(ctx context.Context, tools Tools, host string, now time.Time) Remote {
+	return remoteLayer(ctx, tools, host, now, false)
+}
+
+// RouteLayer verifies a candidate address before any user command is executed.
+func RouteLayer(ctx context.Context, tools Tools, host string, now time.Time) Remote {
+	return remoteLayer(ctx, tools, host, now, true)
+}
+
+func remoteLayer(ctx context.Context, tools Tools, host string, now time.Time, strict bool) Remote {
 	remote := Remote{Versions: map[string]string{}, At: now}
 	ssh := tools.lookPath("ssh")
 	if ssh == "" || tools.Run == nil {
@@ -38,8 +47,11 @@ func RemoteLayer(ctx context.Context, tools Tools, host string, now time.Time) R
 	args := []string{
 		"-o", "BatchMode=yes",
 		"-o", "ConnectTimeout=" + strconv.Itoa(int(ConnectTimeout/time.Second)),
-		host, "--", RemoteScript(),
 	}
+	if strict {
+		args = append(args, "-o", "StrictHostKeyChecking=yes", "-o", "UpdateHostKeys=no", "-o", "ConnectionAttempts=1")
+	}
+	args = append(args, host, "--", RemoteScript())
 	out, errOut, err := tools.Run(ctx, ssh, args...)
 	if err != nil {
 		remote.Reason = remoteFailure(err, errOut)
