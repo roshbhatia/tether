@@ -10,5 +10,6 @@
     "roshbhatia/tap/tether"
   ],
   "manifest_path": "share/wezterm/providers/tether.json",
+  "runtime_note": "Each picker row represents a logical host. Selecting a row checks its ordered SSH addresses and attaches the corresponding native mux domain when available. Other hosts open a local transport pane.",
   "status": "pending"
 }
