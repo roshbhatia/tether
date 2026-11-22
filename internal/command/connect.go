@@ -112,7 +112,7 @@ func connect(prog string, args []string, streams Streams, spec completion.Comman
 	}
 
 	record, cached := facts.Record, facts.Cached
-	if !routed && !(attach && options.dryRun) && !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
+	if !routed && !options.dryRun && !options.noProbe && (!cached || record.NeedsRemoteProbe(tools.Now())) {
 		say("probing %s", target.Name)
 		refreshed, err := coordinator.Refresh(ctx, facts, false)
 		facts = refreshed

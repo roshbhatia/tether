@@ -40,7 +40,7 @@ func TestConnectUsesFreshFactsWhenCacheCannotBeSaved(t *testing.T) {
 				}
 			})
 			f.calls = nil
-			code, out, stderr := runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Minute)), "connect", "--dry-run", "-s", "main", "arrakis")
+			code, _, stderr := runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Minute)), "connect", "-s", "main", "arrakis")
 			if code != 0 || !strings.Contains(stderr, "could not save probe cache") {
 				t.Fatalf("exit=%d stderr=%s", code, stderr)
 			}
@@ -48,15 +48,11 @@ func TestConnectUsesFreshFactsWhenCacheCannotBeSaved(t *testing.T) {
 			if warm {
 				want = "ssh"
 			}
-			if got := decodePlan(t, out).Chosen.Tier; got != want {
-				t.Fatalf("tier=%s want=%s: %s", got, want, out)
+			if !strings.Contains(stderr, "-> arrakis") || !strings.Contains(stderr, "connect: "+want+" ->") || len(f.execs) != 1 {
+				t.Fatalf("want %s: %v %s", want, f.execs, stderr)
 			}
 			if got := f.called("ssh -o BatchMode=yes"); got != 1 {
 				t.Fatalf("remote probes=%d", got)
-			}
-			output := decodePlan(t, out)
-			if output.Probe.At == nil || !output.Probe.At.Equal(epoch.Add(probe.HostTTL+time.Minute)) {
-				t.Fatalf("not fresh: %+v", output.Probe)
 			}
 			if warm && !strings.Contains(stderr, "no supported session provider") {
 				t.Fatalf("old session command survived: %s", stderr)

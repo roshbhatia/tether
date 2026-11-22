@@ -1,5 +1,5 @@
 export extern "tsh" [
-  --dry-run # Write the tether.plan/v1 document and exit without connecting
+  --dry-run # Write the cached tether.plan/v1 plan without probing or connecting
   --foreground # Keep the connection in this terminal
   --help(-h) # Print command help
   --login(-l): string # Remote user, as ssh -l

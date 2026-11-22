@@ -17,6 +17,7 @@ func TestCommandsObserveOnce(t *testing.T) {
 		args   []string
 		remote int
 	}{
+		{"cold dry run", []string{"connect", "--dry-run", "arrakis", "--", "true"}, 0},
 		{"cold connect", []string{"connect", "arrakis", "--", "true"}, 1},
 		{"warm connect", []string{"connect", "--no-probe", "arrakis", "--", "true"}, 0},
 		{"plan", []string{"plan", "--host", "arrakis", "--", "true"}, 0},
@@ -90,21 +91,21 @@ func TestConnectRejectsInventoryForAnotherConnection(t *testing.T) {
 			// The new account has no mux. Old inventory must not add zmx attach.
 			f.runs["ssh -o BatchMode=yes"] = "home:=/home/ops\n"
 			f.calls = nil
-			args := append([]string{"connect", "--dry-run", "-s", "review"}, row.args...)
+			args := append([]string{"connect", "-s", "review"}, row.args...)
 			args = append(args, "arrakis")
-			code, stdout, stderr := runWith(t, f, f.tools(epoch.Add(time.Minute)), args...)
+			code, _, stderr := runWith(t, f, f.tools(epoch.Add(time.Minute)), args...)
 			if code != 0 {
 				t.Fatalf("exit %d: %s", code, stderr)
 			}
-			output := decodePlan(t, stdout)
+			command := strings.Join(f.execs[0], " ")
 			if got := f.called("ssh -o BatchMode=yes"); got != row.probes {
 				t.Fatalf("probes=%d want=%d: %v", got, row.probes, f.calls)
 			}
-			if row.name != "same connection" && (output.Chosen.Tier != "ssh" || strings.Contains(stdout, "zmx attach")) {
-				t.Fatalf("reused another connection's inventory: %s", stdout)
+			if row.name != "same connection" && (!strings.Contains(stderr, "ssh ->") || strings.Contains(command, "zmx attach")) {
+				t.Fatalf("reused another connection's inventory: %s", command)
 			}
-			if row.name == "same connection" && output.Chosen.Tier != "mosh-mux" {
-				t.Fatalf("discarded matching inventory: %s", stdout)
+			if row.name == "same connection" && !strings.Contains(stderr, "mosh-mux ->") {
+				t.Fatalf("discarded matching inventory: %s", stderr)
 			}
 		})
 	}
@@ -137,12 +138,12 @@ func TestConnectRefreshesExpiredFailures(t *testing.T) {
 			}
 			f.runs["ssh -o BatchMode=yes"] = remote
 			f.calls = nil
-			args := []string{"connect", "--dry-run"}
+			args := []string{"connect"}
 			if row.noProbe {
 				args = append(args, "--no-probe")
 			}
 			args = append(args, "arrakis", "--", "true")
-			code, stdout, stderr := runWith(t, f, f.tools(epoch.Add(row.age)), args...)
+			code, _, stderr := runWith(t, f, f.tools(epoch.Add(row.age)), args...)
 			if code != 0 {
 				t.Fatalf("exit %d: %s", code, stderr)
 			}
@@ -153,9 +154,31 @@ func TestConnectRefreshesExpiredFailures(t *testing.T) {
 			if row.failed && row.probes == 0 {
 				want = "ssh"
 			}
-			if got := decodePlan(t, stdout).Chosen.Tier; got != want {
-				t.Fatalf("tier=%s want=%s", got, want)
+			if !strings.Contains(stderr, "connect: "+want+" ->") {
+				t.Fatalf("want tier %s: %s", want, stderr)
 			}
 		})
+	}
+}
+
+func TestConnectDryRunLeavesStaleCacheUnchanged(t *testing.T) {
+	isolate(t)
+	f := connectFake()
+	if code, _, stderr := runWith(t, f, f.tools(epoch), "probe", "--host", "arrakis"); code != 0 {
+		t.Fatal(stderr)
+	}
+	path := probe.DefaultStore().Path("arrakis")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.calls = nil
+	code, out, stderr := runWith(t, f, f.tools(epoch.Add(probe.HostTTL+time.Second)), "connect", "--dry-run", "arrakis")
+	if code != 0 || !decodePlan(t, out).Probe.Stale {
+		t.Fatalf("expected stale preview: %d %s %s", code, out, stderr)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(after) != string(before) || f.called("ssh -o BatchMode") != 0 || len(f.execs) != 0 {
+		t.Fatalf("dry run had side effects: %v %v %v", err, f.calls, f.execs)
 	}
 }

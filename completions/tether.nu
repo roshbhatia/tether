@@ -17,7 +17,7 @@ export extern "tether connect" [
   --port(-p): string # Remote port, as ssh -p
   --mode: string@"__tether_completion_values_1" # Ordering mode; overrides the config
   --pin: string@"__tether_completion_values_2" # Tier that must win; overrides the config
-  --dry-run # Write the tether.plan/v1 document and exit without connecting
+  --dry-run # Write the cached tether.plan/v1 plan without probing or connecting
   --foreground # Keep the connection in this terminal
   --no-probe # Never run the ssh round trip; plan from the cache only
   --version # Write the version to stdout

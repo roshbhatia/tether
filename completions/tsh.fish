@@ -74,7 +74,7 @@ function __tsh_completion_context
   end
   echo $context
 end
-complete -c tsh -n 'test (__tsh_completion_context) = ""' -l dry-run -d 'Write the tether.plan/v1 document and exit without connecting'
+complete -c tsh -n 'test (__tsh_completion_context) = ""' -l dry-run -d 'Write the cached tether.plan/v1 plan without probing or connecting'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l foreground -d 'Keep the connection in this terminal'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l help -s h -d 'Print command help'
 complete -c tsh -n 'test (__tsh_completion_context) = ""' -l login -s l -r -d 'Remote user, as ssh -l'

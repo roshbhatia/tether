@@ -234,7 +234,7 @@ A drop-in for `ssh host` and `mosh host`: resolve the host (ssh config alias, th
 | `--port`, `-p` `<value>` | Remote port, as ssh -p |
 | `--mode` `<value>` | Ordering mode; overrides the config |
 | `--pin` `<value>` | Tier that must win; overrides the config |
-| `--dry-run` | Write the tether.plan/v1 document and exit without connecting |
+| `--dry-run` | Write the cached tether.plan/v1 plan without probing or connecting |
 | `--foreground` | Keep the connection in this terminal |
 | `--no-probe` | Never run the ssh round trip; plan from the cache only |
 | `--version` | Write the version to stdout |
@@ -270,7 +270,7 @@ Same argv as tsh: resolve the host (ssh config alias, then tailnet peer), probe 
 | `--port`, `-p` `<value>` | Remote port, as ssh -p |
 | `--mode` `<value>` | Ordering mode; overrides the config |
 | `--pin` `<value>` | Tier that must win; overrides the config |
-| `--dry-run` | Write the tether.plan/v1 document and exit without connecting |
+| `--dry-run` | Write the cached tether.plan/v1 plan without probing or connecting |
 | `--foreground` | Keep the connection in this terminal |
 | `--no-probe` | Never run the ssh round trip; plan from the cache only |
 | `--version` | Write the version to stdout |

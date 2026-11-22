@@ -148,6 +148,10 @@ func TestConnectTailnetOnlyHostTargetsTheMagicDNSName(t *testing.T) {
 	writeSettings(t, `{"hosts":{"vault":{"user":"ops"}}}`)
 	f := connectFake()
 	f.env["WEZTERM_PANE"] = "3"
+	if code, _, stderr := runWith(t, f, f.tools(epoch), "probe", "--host", "vault"); code != 0 {
+		t.Fatal(stderr)
+	}
+	f.calls = nil
 	code, stdout, stderr := runWith(t, f, f.tools(epoch), "connect", "--dry-run", "vault", "--", "true")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
@@ -168,7 +172,7 @@ func TestConnectTailnetOnlyHostTargetsTheMagicDNSName(t *testing.T) {
 			t.Fatalf("reasons lack %q:\n%s", want, joined)
 		}
 	}
-	if f.called("ssh -o BatchMode=yes -o ConnectTimeout=5 ops@vault.stork-eel.ts.net") != 1 {
+	if f.called("ssh -o BatchMode=yes") != 0 {
 		t.Fatalf("probe target: %v", f.calls)
 	}
 	if len(f.execs) != 0 || f.called("wezterm cli spawn") != 0 {
@@ -237,6 +241,9 @@ func TestConnectUsage(t *testing.T) {
 		t.Fatalf("help: %d %q", code, stderr)
 	}
 	// ssh's shape: options, then the host, then the command; -- is optional.
+	if code, _, stderr := runWith(t, f, f.tools(epoch), "probe", "--host", "arrakis"); code != 0 {
+		t.Fatal(stderr)
+	}
 	code, stdout, _ := runWith(t, f, f.tools(epoch), "connect", "--dry-run", "-s", "s", "arrakis", "htop", "-d", "5")
 	if code != 0 {
 		t.Fatalf("command after host: %d", code)

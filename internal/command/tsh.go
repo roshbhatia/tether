@@ -23,7 +23,7 @@ var tshSpecification = completion.Command{
 		{Name: "port", Short: "p", Description: "Remote port, as ssh -p", Value: true},
 		{Name: "mode", Description: "Ordering mode; overrides the config", Value: true, Values: modeNames},
 		{Name: "pin", Description: "Tier that must win; overrides the config", Value: true, Values: tierNames},
-		{Name: "dry-run", Description: "Write the tether.plan/v1 document and exit without connecting"},
+		{Name: "dry-run", Description: "Write the cached tether.plan/v1 plan without probing or connecting"},
 		{Name: "foreground", Description: "Keep the connection in this terminal"},
 		{Name: "no-probe", Description: "Never run the ssh round trip; plan from the cache only"},
 		{Name: "version", Description: "Write the version to stdout"},
