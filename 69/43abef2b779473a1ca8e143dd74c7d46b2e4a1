@@ -1,0 +1,23 @@
+extras/wezterm/README.md
+  s_a4a3eea4720821::t_87f3f556e71408 3,14-15
+extras/wezterm/demo.json
+  s_a4a3eea4720821::t_85a8d6c17c3acf 13
+package-index.json
+  s_a4a3eea4720821::t_38711160624a6b 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6943abef2b779473a1ca8e143dd74c7d46b2e4a1",
+  "prompts": {},
+  "sessions": {
+    "s_a4a3eea4720821": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f4ef-68fa-7c11-b609-3f16bf1d9bf7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Roshan Bhatia <rshnbhatia@gmail.com>"
+    }
+  }
+}
